@@ -3,7 +3,7 @@
 #include "SocketUtils.h"
 #include"PacketHeader.h"
 #include"PacketType.h"
-char *SERVERIP = (char *)"121.169.113.207";
+char *SERVERIP = (char *)"59.13.163.140";
 #define SERVERPORT 9000
 #define BUFSIZE    512
 
@@ -32,7 +32,121 @@ int main(int argc, char* argv[])
 
 	retval = connect(sock, (struct sockaddr*)&serveraddr, sizeof(serveraddr));
 	if (retval == SOCKET_ERROR) err_quit("connect()");
+	LoginRequest loginRequest{};
 
+	loginRequest.header.size =
+		static_cast<uint16_t>(sizeof(LoginRequest));
+
+	loginRequest.header.type =
+		static_cast<uint16_t>(PacketType::LOGIN_REQUEST);
+
+	printf("닉네임 입력: ");
+
+	if (fgets(
+		loginRequest.nickname,
+		sizeof(loginRequest.nickname),
+		stdin) == nullptr)
+	{
+		closesocket(sock);
+		WSACleanup();
+		return 1;
+	}
+
+	size_t nicknameLength =
+		strlen(loginRequest.nickname);
+
+	if (nicknameLength > 0 &&
+		loginRequest.nickname[nicknameLength - 1] == '\n')
+	{
+		loginRequest.nickname[nicknameLength - 1] = '\0';
+	}
+
+	if (strlen(loginRequest.nickname) == 0)
+	{
+		printf("[오류] 닉네임이 비어 있습니다.\n");
+
+		closesocket(sock);
+		WSACleanup();
+		return 1;
+	}
+
+	if (!SocketUtils::SendAll(
+		sock,
+		reinterpret_cast<const char*>(&loginRequest),
+		sizeof(loginRequest)))
+	{
+		err_quit("로그인 요청 전송");
+	}
+	LoginResponse loginResponse{};
+
+	if (!SocketUtils::RecvAll(
+		sock,
+		reinterpret_cast<char*>(&loginResponse.header),
+		sizeof(PacketHeader)))
+	{
+		printf("[오류] 로그인 응답 헤더 수신 실패\n");
+
+		closesocket(sock);
+		WSACleanup();
+		return 1;
+	}
+
+	if (loginResponse.header.type !=
+		static_cast<uint16_t>(PacketType::LOGIN_RESPONSE))
+	{
+		printf(
+			"[오류] 잘못된 로그인 응답 타입: %d\n",
+			loginResponse.header.type
+		);
+
+		closesocket(sock);
+		WSACleanup();
+		return 1;
+	}
+
+	if (loginResponse.header.size != sizeof(LoginResponse))
+	{
+		printf(
+			"[오류] 잘못된 로그인 응답 크기: %d\n",
+			loginResponse.header.size
+		);
+
+		closesocket(sock);
+		WSACleanup();
+		return 1;
+	}
+
+	int responseBodySize =
+		loginResponse.header.size - sizeof(PacketHeader);
+
+	if (!SocketUtils::RecvAll(
+		sock,
+		reinterpret_cast<char*>(&loginResponse)
+		+ sizeof(PacketHeader),
+		responseBodySize))
+	{
+		printf("[오류] 로그인 응답 바디 수신 실패\n");
+
+		closesocket(sock);
+		WSACleanup();
+		return 1;
+	}
+
+	if (loginResponse.success == 0)
+	{
+		printf(
+			"[로그인 실패] 이미 사용 중이거나 잘못된 닉네임입니다.\n"
+		);
+
+		closesocket(sock);
+		WSACleanup();
+		return 1;
+	}
+
+	printf(
+		"[로그인 성공] 발급된 User ID: %d\n",
+		loginResponse.userId
+	);
 	// 데이터 통신에 사용할 변수
 	char buf[BUFSIZE + 1];
 	int len;

@@ -144,6 +144,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="NetworkCore.cpp" />
+    <ClCompile Include="PacketHandler.cpp" />
     <ClCompile Include="Session.cpp" />
     <ClCompile Include="SocketUtils.cpp" />
     <ClCompile Include="TCPServer.cpp" />
@@ -151,6 +152,7 @@
   <ItemGroup>
     <ClInclude Include="..\Common.h" />
     <ClInclude Include="NetworkCore.h" />
+    <ClInclude Include="PacketHandler.h" />
     <ClInclude Include="PacketHeader.h" />
     <ClInclude Include="PacketType.h" />
     <ClInclude Include="Session.h" />

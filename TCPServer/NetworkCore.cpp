@@ -35,12 +35,12 @@ void NetworkCore::Run()
 	{
 		sockaddr_in clientaddr{};
 		SOCKET client_sock = AcceptClient(clientaddr);
-		AddClient(client_sock);
 		if (client_sock == INVALID_SOCKET)
 			continue;
-		std::thread t([this, client_sock, clientaddr]() {
-			Session session(client_sock, clientaddr, this);
-			session.Process();
+		auto session = std::make_shared<Session>(client_sock, clientaddr, this);
+		AddClient(session);
+		std::thread t([session]() {
+			session->Process();
 			});
 		t.detach();
 	}
@@ -49,6 +49,7 @@ void NetworkCore::Run()
 void NetworkCore::closeSock()
 {
 	RemoveClient(client_sock);
+	
 	closesocket(client_sock);
 	WSACleanup();
 }
@@ -78,29 +79,68 @@ SOCKET NetworkCore::AcceptClient(sockaddr_in& clientaddr)
 
 }
 
-void NetworkCore::AddClient(SOCKET client_sock)
+bool NetworkCore::TrySetNickname(SOCKET client_sock, const std::string& nickname)
 {
 	std::lock_guard<std::mutex> lock(mtx);
-	sessions.push_back(client_sock);
+
+	for (const auto& session : sessions)
+	{
+		if (session->GetSocket() == client_sock)
+		{
+			continue;
+		}
+
+		if (session->GetNickname() == nickname)
+		{
+			return false;
+		}
+	}
+
+	for (const auto& session : sessions)
+	{
+		if (session->GetSocket() == client_sock)
+		{
+			session->SetNickname(nickname);
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void NetworkCore::AddClient(const std::shared_ptr<Session>& session)
+{	
+	std::lock_guard<std::mutex> lock(mtx);
+	sessions.push_back(session);
 }
 
 void NetworkCore::RemoveClient(SOCKET client_sock)
 {
 	std::lock_guard<std::mutex> lock(mtx);
-	sessions.erase(std::remove(sessions.begin(),sessions.end(), client_sock));
+	sessions.erase(std::remove_if(sessions.begin(), sessions.end(),
+		[client_sock](const std::shared_ptr<Session>& session) {
+			return session->GetSocket() == client_sock;
+		}
+		),
+		sessions.end()
+	);
 }
 
 void NetworkCore::Broadcast(SOCKET sender_sock, const char* packetData, int packetSize)
 {
-	std::lock_guard<std::mutex> lock(mtx);
-	for (auto sock : sessions)
+	std::vector<std::shared_ptr<Session>> sessionsCopy;
 	{
-		if (sender_sock == sock)
+		std::lock_guard<std::mutex> lock(mtx);
+		sessionsCopy = sessions;
+	}
+	for (const auto& session : sessionsCopy)
+	{
+		if (sender_sock == session->GetSocket())
 			continue;
-		retval = SocketUtils::SendAll(sock, packetData, packetSize);
-		if (retval == SOCKET_ERROR)
+
+		if (!session->Send(packetData, packetSize))
 		{
-			err_display("send()");
+			err_display("SendAll()");
 		}
 	}
 }
