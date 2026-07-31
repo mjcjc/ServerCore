@@ -48,9 +48,11 @@ void NetworkCore::Run()
 
 void NetworkCore::closeSock()
 {
-	RemoveClient(client_sock);
-	
-	closesocket(client_sock);
+	if (listen_sock != INVALID_SOCKET)
+	{
+		closesocket(listen_sock);
+		listen_sock = INVALID_SOCKET;
+	}
 	WSACleanup();
 }
 
@@ -114,19 +116,19 @@ void NetworkCore::AddClient(const std::shared_ptr<Session>& session)
 	sessions.push_back(session);
 }
 
-void NetworkCore::RemoveClient(SOCKET client_sock)
+void NetworkCore::RemoveClient(const Session* targetSession)
 {
 	std::lock_guard<std::mutex> lock(mtx);
 	sessions.erase(std::remove_if(sessions.begin(), sessions.end(),
-		[client_sock](const std::shared_ptr<Session>& session) {
-			return session->GetSocket() == client_sock;
+		[targetSession](const std::shared_ptr<Session>& session) {
+			return session.get() == targetSession;
 		}
 		),
 		sessions.end()
 	);
 }
 
-void NetworkCore::Broadcast(SOCKET sender_sock, const char* packetData, int packetSize)
+void NetworkCore::Broadcast(const Session* senderSession, const char* packetData, int packetSize)
 {
 	std::vector<std::shared_ptr<Session>> sessionsCopy;
 	{
@@ -135,12 +137,13 @@ void NetworkCore::Broadcast(SOCKET sender_sock, const char* packetData, int pack
 	}
 	for (const auto& session : sessionsCopy)
 	{
-		if (sender_sock == session->GetSocket())
+		if (senderSession == session.get())
 			continue;
 
 		if (!session->Send(packetData, packetSize))
 		{
-			err_display("SendAll()");
+			err_display("Send()");
+			session->Disconnect();
 		}
 	}
 }

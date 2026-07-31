@@ -19,16 +19,15 @@ public:
 
 public:
 	void AddClient(const std::shared_ptr<Session>& session);
-	void RemoveClient(SOCKET client_sock);
-	void Broadcast(SOCKET sender_sock, const char* packetData, int packetSize);
+	void RemoveClient(const Session* targetSession);
+	void Broadcast(const Session* senderSession, const char* packetData, int packetSize);
 
 	SOCKET AcceptClient(sockaddr_in& clientaddr);
 	SOCKET listen_sock;
-	SOCKET client_sock;
 	sockaddr_in serveraddr;
 	sockaddr_in clientaddr;
 
-	bool TrySetNickname(SOCKET client_sock, const std::string& nickname);
+	bool TrySetNickname(Session* senderSession, const std::string& nickname);
 
 	int retval;
 private:

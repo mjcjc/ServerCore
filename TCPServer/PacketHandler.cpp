@@ -1,12 +1,5 @@
 #include "PacketHandler.h"
 
-#include "Session.h"
-#include "NetworkCore.h"
-#include "PacketHeader.h"
-#include "PacketType.h"
-
-#include <atomic>
-#include <string>
 
 static std::atomic<int> UserIdCount{ 1 };
 
@@ -34,9 +27,12 @@ void PacketHandler::HandlePacket(
         break;
     }
 
-    case PacketType::MESSAGE:
+    case PacketType::CHAT_REQUEST:
     {
-        HandleMessage(session, packet);
+        const ChatRequest* chatRequest =
+            reinterpret_cast<const ChatRequest*>(packet);
+
+        HandleChat(session, chatRequest);
         break;
     }
 
@@ -157,34 +153,80 @@ void PacketHandler::HandleLogin(
     );
 }
 
-void PacketHandler::HandleMessage(
+void PacketHandler::HandleChat(
     Session* session,
-    const char* packet)
+    const ChatRequest* packet)
 {
     if (session->GetState() != SessionState::LOGIN)
     {
         printf(
-            "[오류] 로그인하지 않은 세션의 채팅 요청\n"
+            "[채팅 거부] 로그인하지 않은 세션입니다.\n"
         );
 
         return;
     }
 
-    const PacketHeader* header =
-        reinterpret_cast<const PacketHeader*>(packet);
+    if (packet->header.size != sizeof(ChatRequest))
+    {
+        printf(
+            "[채팅 거부] 잘못된 패킷 크기입니다.\n"
+        );
 
-    const char* body =
-        packet + sizeof(PacketHeader);
+        return;
+    }
+
+    size_t messageLength = strnlen_s(
+        packet->message,
+        sizeof(packet->message)
+    );
+
+    if (messageLength == 0 ||
+        messageLength >= sizeof(packet->message))
+    {
+        printf(
+            "[채팅 거부] 잘못된 메시지입니다.\n"
+        );
+
+        return;
+    }
+
+    ChatResponse response{};
+
+    response.header.size =
+        static_cast<uint16_t>(
+            sizeof(ChatResponse)
+            );
+
+    response.header.type =
+        static_cast<uint16_t>(
+            PacketType::CHAT_RESPONSE
+            );
+    response.userId = session->GetId();
+
+    strncpy_s(
+        response.nickname,
+        sizeof(response.nickname),
+        session->GetNickname().c_str(),
+        _TRUNCATE
+    );
+
+    strncpy_s(
+        response.message,
+        sizeof(response.message),
+        packet->message,
+        _TRUNCATE
+    );
 
     printf(
-        "[받은 채팅] %s: %s\n",
-        session->GetNickname().c_str(),
-        body
+        "[받은 채팅] %s(%d): %s\n",
+        response.nickname,
+        response.userId,
+        response.message
     );
 
     session->GetServer()->Broadcast(
-        session->GetSocket(),
-        packet,
-        header->size
+        session,
+        reinterpret_cast<const char*>(&response),
+        sizeof(response)
     );
 }

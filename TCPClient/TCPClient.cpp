@@ -154,121 +154,198 @@ int main(int argc, char* argv[])
 	std::atomic<bool> running = true;
 
 	// 수신 스레드: 서버에서 오는 데이터를 계속 받음
-	std::thread recv_thread([&]() {
-		while (running)
+	std::thread recv_thread([&]()
 		{
-			PacketHeader header;
-
-			// 1. 헤더 먼저 받기
-			if (!SocketUtils::RecvAll(sock, (char*)&header, sizeof(PacketHeader)))
+			while (running)
 			{
-				break;
+				PacketHeader header{};
+
+				// 헤더 수신
+				if (!SocketUtils::RecvAll(
+					sock,
+					reinterpret_cast<char*>(&header),
+					sizeof(PacketHeader)))
+				{
+					break;
+				}
+
+				// 패킷 크기 검사
+				if (header.size < sizeof(PacketHeader))
+				{
+					printf("\n[오류] 잘못된 패킷 크기입니다.\n");
+					break;
+				}
+
+				if (header.size > BUFSIZE)
+				{
+					printf("\n[오류] 패킷 크기가 너무 큽니다.\n");
+					break;
+				}
+
+				int bodySize =
+					header.size - sizeof(PacketHeader);
+
+				// 헤더와 바디를 합쳐서 저장할 전체 패킷 버퍼
+				char packet[BUFSIZE + 1]{};
+
+				memcpy(
+					packet,
+					&header,
+					sizeof(PacketHeader)
+				);
+
+				// 바디 수신
+				if (!SocketUtils::RecvAll(
+					sock,
+					packet + sizeof(PacketHeader),
+					bodySize))
+				{
+					break;
+				}
+
+				switch (static_cast<PacketType>(header.type))
+				{
+				case PacketType::CHAT_RESPONSE:
+				{
+					if (header.size != sizeof(ChatResponse))
+					{
+						printf(
+							"\n[오류] 잘못된 채팅 응답 크기입니다. "
+							"size=%d\n",
+							header.size
+						);
+
+						break;
+					}
+
+					const ChatResponse* response =
+						reinterpret_cast<const ChatResponse*>(
+							packet
+							);
+
+					size_t nicknameLength =
+						strnlen_s(
+							response->nickname,
+							sizeof(response->nickname)
+						);
+
+					size_t messageLength =
+						strnlen_s(
+							response->message,
+							sizeof(response->message)
+						);
+
+					// 배열 내부에 널 문자가 없는 잘못된 패킷
+					if (nicknameLength >=
+						sizeof(response->nickname) ||
+						messageLength >=
+						sizeof(response->message))
+					{
+						printf(
+							"\n[오류] 잘못된 채팅 응답입니다.\n"
+						);
+
+						break;
+					}
+
+					printf(
+						"\n[%s / ID:%d] %s\n",
+						response->nickname,
+						response->userId,
+						response->message
+					);
+
+					printf("[보낼 데이터] ");
+					fflush(stdout);
+
+					break;
+				}
+
+				default:
+				{
+					printf(
+						"\n[오류] 알 수 없는 패킷 타입입니다. "
+						"type=%d\n",
+						header.type
+					);
+
+					break;
+				}
+				}
 			}
 
-			// 2. 패킷 크기 검사
-			if (header.size < sizeof(PacketHeader))
-			{
-				printf("\n[오류] 잘못된 패킷 크기입니다.\n");
-				break;
-			}
-
-			if (header.size > BUFSIZE)
-			{
-				printf("\n[오류] 패킷 크기가 너무 큽니다.\n");
-				break;
-			}
-
-			// 3. body 크기 계산
-			int bodySize = header.size - sizeof(PacketHeader);
-
-			char recvbuf[BUFSIZE + 1] = {};
-
-			// 4. body 받기
-			if (!SocketUtils::RecvAll(sock, recvbuf, bodySize))
-			{
-				break;
-			}
-
-			recvbuf[bodySize] = '\0';
-
-			// 5. 패킷 타입 확인
-			if (header.type == static_cast<uint16_t>(PacketType::MESSAGE))
-			{
-				printf("\n[받은 데이터] %s\n", recvbuf);
-				printf("[보낼 데이터] ");
-				fflush(stdout);
-			}
-			else
-			{
-				printf("\n[오류] 알 수 없는 패킷 타입입니다. type=%d\n", header.type);
-			}
-		}
-
-		running = false;
+			running = false;
 		});
 	// 송신 루프: 키보드 입력을 받아 서버로 보냄
-	while (running) {
-		// 데이터 입력
-		printf("\n[보낼 데이터] ");
-		if (fgets(buf, BUFSIZE + 1, stdin) == NULL)
-			break;
-
-		//// '\n' 문자 제거
-		//len = (int)strlen(buf);
-
-		//if (len > 0 && buf[len - 1] == '\n')
-		//	buf[len - 1] = '\0';
-		//PacketHeader header;
-		//header.type = static_cast<uint16_t>(PacketType::MESSAGE);
-		//header.size = static_cast<uint16_t>(strlen(buf) + sizeof(PacketHeader));
-
-		//// [Header][Body] 형태의 전체 패킷 만들기
-		//char packet[BUFSIZE] = {};
-
-		//memcpy(packet, &header, sizeof(PacketHeader));
-		//memcpy(packet + sizeof(PacketHeader), buf, bodySize);
-		//// 빈 문자열이면 종료
-		//if (strlen(buf) == 0)
-		//	break;
-
-		//// 데이터 보내기
-		//retval = SocketUtils::SendAll(sock, (char*)&header, sizeof(header));
-		//if (retval == SOCKET_ERROR) {
-		//	err_display("send()");
-		//	break;
-		//}
-		// 빈 문자열이면 종료
-		if (strlen(buf) == 0)
-			break;
-
-		int bodySize = (int)strlen(buf);
-		int packetSize = sizeof(PacketHeader) + bodySize;
-
-		if (packetSize > BUFSIZE)
+		while (running)
 		{
-			printf("[오류] 패킷 크기가 너무 큽니다.\n");
-			continue;
+			printf("\n[보낼 데이터] ");
+
+			if (fgets(buf, BUFSIZE + 1, stdin) == nullptr)
+			{
+				break;
+			}
+
+			size_t messageLength = strlen(buf);
+
+			// fgets()가 입력한 마지막 개행 문자 제거
+			if (messageLength > 0 &&
+				buf[messageLength - 1] == '\n')
+			{
+				buf[messageLength - 1] = '\0';
+				--messageLength;
+			}
+
+			// 빈 메시지는 전송하지 않음
+			if (messageLength == 0)
+			{
+				continue;
+			}
+
+			ChatRequest request{};
+
+			// message[256]에 들어갈 수 있는지 검사
+			if (messageLength >= sizeof(request.message))
+			{
+				printf(
+					"[오류] 메시지는 최대 %zu바이트까지 가능합니다.\n",
+					sizeof(request.message) - 1
+				);
+
+				continue;
+			}
+
+			request.header.size =
+				static_cast<uint16_t>(
+					sizeof(ChatRequest)
+					);
+
+			request.header.type =
+				static_cast<uint16_t>(
+					PacketType::CHAT_REQUEST
+					);
+
+			strncpy_s(
+				request.message,
+				sizeof(request.message),
+				buf,
+				_TRUNCATE
+			);
+
+			if (!SocketUtils::SendAll(
+				sock,
+				reinterpret_cast<const char*>(&request),
+				sizeof(ChatRequest)))
+			{
+				err_display("ChatRequest SendAll()");
+				break;
+			}
+
+			printf(
+				"[TCP 클라이언트] %zu바이트를 보냈습니다.\n",
+				sizeof(ChatRequest)
+			);
 		}
-
-		PacketHeader header;
-		header.type = static_cast<uint16_t>(PacketType::MESSAGE);
-		header.size = static_cast<uint16_t>(packetSize);
-
-		// [Header][Body] 형태의 전체 패킷 만들기
-		char packet[BUFSIZE] = {};
-
-		memcpy(packet, &header, sizeof(PacketHeader));
-		memcpy(packet + sizeof(PacketHeader), buf, bodySize);
-
-		// 전체 패킷 보내기
-		if (!SocketUtils::SendAll(sock, packet, packetSize))
-		{
-			err_display("SendAll()");
-			break;
-		}
-		printf("[TCP 클라이언트] %d바이트를 보냈습니다.\n", retval);
-
-	}
 
 	// 종료 처리
 	running = false;

@@ -1,4 +1,10 @@
 #pragma once
+#include "Session.h"
+#include "NetworkCore.h"
+#include "PacketHeader.h"
+#include "PacketType.h"
+#include <atomic>
+#include <string>
 
 class Session;
 struct LoginRequest;
@@ -17,8 +23,8 @@ private:
         const LoginRequest* packet
     );
 
-    static void HandleMessage(
+    static void HandleChat(
         Session* session,
-        const char* packet
+        const ChatRequest* packet
     );
 };

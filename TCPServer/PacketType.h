@@ -3,9 +3,11 @@
 
 enum class PacketType : uint16_t
 {
-	MESSAGE = 1,
-	LOGIN_REQUEST = 2,
-	LOGIN_RESPONSE = 3,
+	LOGIN_REQUEST = 1,
+	LOGIN_RESPONSE = 2,
+
+	CHAT_REQUEST = 3,
+	CHAT_RESPONSE = 4,
 	
 };
 
@@ -21,4 +23,19 @@ struct LoginResponse
 	PacketHeader header;
 	uint8_t success;
 	int userId;
+};
+
+struct ChatRequest
+{
+	PacketHeader header;
+	char message[256];
+};
+
+struct ChatResponse
+{
+	PacketHeader header;
+
+	int32_t userId;
+	char nickname[20];
+	char message[256];
 };
