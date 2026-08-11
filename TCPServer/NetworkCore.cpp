@@ -1,12 +1,56 @@
-#include "NetworkCore.h"
+Ôªø#include "NetworkCore.h"
 #include "SocketUtils.h"
 #include "Session.h"
+
+#include "IocpEvent.h"
+
+#include <memory>
 
 void NetworkCore::Initialize()
 {
 	WSADATA wsa;
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
 		return;
+
+	const unsigned int hardwareThreadCount =
+		std::thread::hardware_concurrency();
+	const std::size_t workerCount =
+		hardwareThreadCount == 0 ? 1 : hardwareThreadCount;
+
+	if (!iocpCore.Start(
+		workerCount,
+		[](DWORD transferredBytes,
+			ULONG_PTR completionKey,
+			OVERLAPPED* overlapped,
+			DWORD errorCode)
+		{
+			auto event = std::unique_ptr<IocpEvent>(
+				reinterpret_cast<IocpEvent*>(overlapped)
+			);
+
+			if (!event || !event->owner)
+			{
+				return;
+			}
+
+			Session* completedSession =
+				reinterpret_cast<Session*>(completionKey);
+
+			if (completedSession != event->owner.get())
+			{
+				event->owner->Disconnect();
+				return;
+			}
+
+			event->owner->HandleIoCompleted(
+				event.get(),
+				transferredBytes,
+				errorCode
+			);
+		}))
+	{
+		err_quit("IocpCore::Start()");
+	}
 
 	listen_sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (listen_sock == INVALID_SOCKET) err_quit("socket()");
@@ -39,15 +83,26 @@ void NetworkCore::Run()
 			continue;
 		auto session = std::make_shared<Session>(client_sock, clientaddr, this);
 		AddClient(session);
-		std::thread t([session]() {
-			session->Process();
-			});
-		t.detach();
+
+		if (!iocpCore.RegisterSocket(
+			client_sock,
+			reinterpret_cast<ULONG_PTR>(session.get())))
+		{
+			session->Disconnect();
+			continue;
+		}
+
+		if (!session->StartAsyncReceive())
+		{
+			session->Disconnect();
+		}
 	}
 }
 
 void NetworkCore::closeSock()
 {
+	iocpCore.Stop();
+
 	if (listen_sock != INVALID_SOCKET)
 	{
 		closesocket(listen_sock);
@@ -74,20 +129,20 @@ SOCKET NetworkCore::AcceptClient(sockaddr_in& clientaddr)
 	char addr[INET_ADDRSTRLEN];
 	inet_ntop(AF_INET, &clientaddr.sin_addr, addr, sizeof(addr));
 
-	printf("\n[TCP º≠πˆ] ≈¨∂Û¿Ãæ∆Æ ¡¢º”: IP ¡÷º“=%s, ∆˜∆Æ π¯»£=%d\n",
+	printf("\n[TCP ÏÑúÎ≤Ñ] ÌÅ¥ÎùºÏù¥Ïñ∏Ìä∏ Ï†ëÏÜç: IP Ï£ºÏÜå=%s, Ìè¨Ìä∏ Î≤àÌò∏=%d\n",
 		addr, ntohs(clientaddr.sin_port));
 
 	return client_sock;
 
 }
 
-bool NetworkCore::TrySetNickname(SOCKET client_sock, const std::string& nickname)
+bool NetworkCore::TrySetNickname(Session* senderSession, const std::string& nickname)
 {
 	std::lock_guard<std::mutex> lock(mtx);
 
 	for (const auto& session : sessions)
 	{
-		if (session->GetSocket() == client_sock)
+		if (session.get() == senderSession)
 		{
 			continue;
 		}
@@ -100,7 +155,7 @@ bool NetworkCore::TrySetNickname(SOCKET client_sock, const std::string& nickname
 
 	for (const auto& session : sessions)
 	{
-		if (session->GetSocket() == client_sock)
+		if (session.get() == senderSession)
 		{
 			session->SetNickname(nickname);
 			return true;

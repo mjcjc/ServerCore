@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <cstddef>
 #include <mutex>
@@ -7,9 +7,10 @@
 
 enum class EnqueueResult
 {
-    REJECTED,       // Å¥°¡ ´İÇû°Å³ª Àß¸øµÈ ÆĞÅ¶
-    QUEUED,         // Å¥¿¡´Â ³Ö¾úÁö¸¸ ´Ù¸¥ ½º·¹µå°¡ Àü¼Û Áß
-    START_FLUSHING  // ÇöÀç ½º·¹µå°¡ Àü¼ÛÀ» ½ÃÀÛÇØ¾ß ÇÔ
+    REJECTED,       // íê°€ ë‹«í˜”ê±°ë‚˜ ì˜ëª»ëœ íŒ¨í‚·
+    QUEUE_FULL,
+    QUEUED,         // íì—ëŠ” ë„£ì—ˆì§€ë§Œ ë‹¤ë¥¸ ìŠ¤ë ˆë“œê°€ ì „ì†¡ ì¤‘
+    START_FLUSHING  // í˜„ì¬ ìŠ¤ë ˆë“œê°€ ì „ì†¡ì„ ì‹œì‘í•´ì•¼ í•¨
 };
 
 class SendQueue
@@ -24,13 +25,25 @@ public:
         std::vector<char>& outPacket
     );
 
+    bool TryBeginSend(
+        std::vector<char>& outPacket
+    );
+
+    bool CompleteSendAndGetNext(
+        std::size_t completedPacketSize,
+        std::vector<char>& outNextPacket
+    );
+
     void Close();
 
 private:
+    static constexpr std::size_t MAX_QUEUED_BYTES = 64 * 1024; // 64KB
+
     std::mutex queueMutex;
 
     std::queue<std::vector<char>> packets;
 
+    std::size_t queuedBytes = 0;
     bool isFlushing = false;
     bool isClosed = false;
 };

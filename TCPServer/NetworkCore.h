@@ -1,9 +1,11 @@
 #pragma once
 
-#include"../Common.h"
-#include<vector>
-#include<mutex>
-#include"Session.h"
+#include "../Common.h"
+#include "IocpCore.h"
+
+#include <memory>
+#include <mutex>
+#include <vector>
 
 class Session;
 
@@ -31,7 +33,7 @@ public:
 
 	int retval;
 private:
+	IocpCore iocpCore;
 	std::vector<std::shared_ptr<Session>> sessions;
 	std::mutex mtx;
 };
-

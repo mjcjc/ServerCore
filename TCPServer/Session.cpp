@@ -1,51 +1,158 @@
-#include "Session.h"
+ï»¿#include "Session.h"
 #include "NetworkCore.h"
-#include "SocketUtils.h"
 #include "PacketHandler.h"
 #include "PacketHeader.h"
+
+#include <cstring>
+#include <memory>
 
 
 Session::Session(SOCKET client_sock, sockaddr_in clientaddr, NetworkCore* server)
     : client_sock(client_sock), clientaddr(clientaddr), server(server)
 {
 }
-void Session::Process()
+
+bool Session::StartAsyncReceive()
 {
-    while (true)
+    receiveBuffer.reserve(BUFSIZE * 2);
+    return PostRecv();
+}
+
+bool Session::PostRecv()
+{
+    SOCKET socket = INVALID_SOCKET;
+
     {
-		PacketHeader header;
+        std::lock_guard<std::mutex> lock(sendMutex);
 
-		if (!SocketUtils::RecvAll(client_sock, (char*)&header, sizeof(header)))
-			break;
+        if (state == SessionState::DISCONNECTED ||
+            client_sock == INVALID_SOCKET)
+        {
+            return false;
+        }
 
-		if (header.size < sizeof(PacketHeader))
-			break;
-
-		if (header.size > BUFSIZE)
-			break;
-
-		int bodySize = header.size - sizeof(PacketHeader);
-		char packet[BUFSIZE + 1] = {};
-
-		memcpy(packet, &header, sizeof(header));
-
-		if (!SocketUtils::RecvAll(client_sock, packet + sizeof(PacketHeader), bodySize))
-			break;
-
-		char* body = packet + sizeof(PacketHeader);
-		body[bodySize] = '\0';
-
-		PacketHandler::HandlePacket(this, packet);
+        socket = client_sock;
     }
 
-	Disconnect();
-    char addr[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &clientaddr.sin_addr, addr, sizeof(addr));
+    auto event = std::make_unique<IocpEvent>(
+        IoOperation::RECV,
+        shared_from_this()
+    );
 
-    printf("[TCP ¼­¹ö] Å¬¶óÀÌ¾ðÆ® Á¾·á: IP ÁÖ¼Ò=%s, Æ÷Æ® ¹øÈ£=%d\n",
-        addr, ntohs(clientaddr.sin_port));
+    DWORD flags = 0;
+    DWORD receivedBytes = 0;
 
+    const int result = WSARecv(
+        socket,
+        &event->wsabuf,
+        1,
+        &receivedBytes,
+        &flags,
+        &event->overlapped,
+        nullptr
+    );
+
+    if (result == SOCKET_ERROR)
+    {
+        const int errorCode = WSAGetLastError();
+
+        if (errorCode != WSA_IO_PENDING)
+        {
+            Disconnect();
+            return false;
+        }
+    }
+
+    event.release();
+    return true;
 }
+
+void Session::HandleIoCompleted(
+    IocpEvent* event,
+    DWORD transferredBytes,
+    DWORD errorCode)
+{
+    if (errorCode != ERROR_SUCCESS || transferredBytes == 0)
+    {
+        Disconnect();
+        return;
+    }
+
+    switch (event->type)
+    {
+    case IoOperation::RECV:
+        HandleRecvCompleted(event, transferredBytes);
+        break;
+
+    case IoOperation::SEND:
+        if (!HandleSendCompleted(event, transferredBytes))
+        {
+            Disconnect();
+        }
+        break;
+    }
+}
+
+bool Session::HandleRecvCompleted(
+    IocpEvent* event,
+    DWORD transferredBytes)
+{
+    receiveBuffer.insert(
+        receiveBuffer.end(),
+        event->storage.data(),
+        event->storage.data() + transferredBytes
+    );
+
+    if (!ProcessReceivedPackets())
+    {
+        Disconnect();
+        return false;
+    }
+
+    return PostRecv();
+}
+
+bool Session::ProcessReceivedPackets()
+{
+    while (receiveBuffer.size() >= sizeof(PacketHeader))
+    {
+        PacketHeader header{};
+        std::memcpy(
+            &header,
+            receiveBuffer.data(),
+            sizeof(header)
+        );
+
+        if (header.size < sizeof(PacketHeader) ||
+            header.size > BUFSIZE)
+        {
+            return false;
+        }
+
+        if (receiveBuffer.size() < header.size)
+        {
+            break;
+        }
+
+        PacketHandler::HandlePacket(
+            this,
+            receiveBuffer.data()
+        );
+
+        receiveBuffer.erase(
+            receiveBuffer.begin(),
+            receiveBuffer.begin() + header.size
+        );
+
+        if (GetState() == SessionState::DISCONNECTED)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 
 bool Session::Send(
     const char* packetData,
@@ -77,7 +184,15 @@ bool Session::Send(
     {
         return false;
     }
+    case EnqueueResult::QUEUE_FULL:
+    {
+        printf(
+            "SendQueue ìµœëŒ€ ìš©ëŸ‰ ì´ˆê³¼ ì„¸ì…˜ ì¢…ë£Œ\n"
+        );
 
+        Disconnect();
+        return false;
+    }
     case EnqueueResult::QUEUED:
     {
         return true;
@@ -85,7 +200,13 @@ bool Session::Send(
 
     case EnqueueResult::START_FLUSHING:
     {
-        return FlushSendQueue();
+        if (!StartNextSend())
+        {
+            Disconnect();
+            return false;
+        }
+
+        return true;
     }
     }
 
@@ -117,41 +238,110 @@ void Session::Disconnect()
 		closesocket(closesock);
 	}
 }
-bool Session::FlushSendQueue()
+bool Session::StartNextSend()
 {
     std::vector<char> packet;
 
-    while (sendQueue.TryPop(packet))
+    if (!sendQueue.TryBeginSend(packet))
     {
-        bool sendSucceeded = false;
+        return false;
+    }
 
+    return PostSend(std::move(packet));
+}
+
+bool Session::PostSend(
+    std::vector<char> packet,
+    std::size_t sendOffset)
+{
+    SOCKET socket = INVALID_SOCKET;
+
+    {
+        std::lock_guard<std::mutex> lock(sendMutex);
+
+        if (state == SessionState::DISCONNECTED ||
+            client_sock == INVALID_SOCKET)
         {
-            std::lock_guard<std::mutex> lock(
-                sendMutex
-            );
-
-            if (state != SessionState::DISCONNECTED &&
-                client_sock != INVALID_SOCKET)
-            {
-                sendSucceeded =
-                    SocketUtils::SendAll(
-                        client_sock,
-                        packet.data(),
-                        static_cast<int>(
-                            packet.size()
-                            )
-                    );
-            }
-        }
-
-        if (!sendSucceeded)
-        {
-            Disconnect();
             return false;
         }
 
-        packet.clear();
+        socket = client_sock;
     }
 
+    auto event = std::make_unique<IocpEvent>(
+        IoOperation::SEND,
+        shared_from_this()
+    );
+
+    event->SetSendData(std::move(packet));
+
+    if (sendOffset > event->sendData.size())
+    {
+        return false;
+    }
+
+    event->AdvanceSend(static_cast<DWORD>(sendOffset));
+
+    if (event->wsabuf.len == 0)
+    {
+        return false;
+    }
+
+    DWORD sentBytes = 0;
+
+    const int result = WSASend(
+        socket,
+        &event->wsabuf,
+        1,
+        &sentBytes,
+        0,
+        &event->overlapped,
+        nullptr
+    );
+
+    if (result == SOCKET_ERROR)
+    {
+        const int errorCode = WSAGetLastError();
+
+        if (errorCode != WSA_IO_PENDING)
+        {
+            return false;
+        }
+    }
+
+    event.release();
     return true;
+}
+
+bool Session::HandleSendCompleted(
+    IocpEvent* event,
+    DWORD transferredBytes)
+{
+    if (transferredBytes > event->wsabuf.len)
+    {
+        return false;
+    }
+
+    event->AdvanceSend(transferredBytes);
+
+    if (!event->IsSendComplete())
+    {
+        return PostSend(
+            std::move(event->sendData),
+            event->sendOffset
+        );
+    }
+
+    const std::size_t completedPacketSize =
+        event->sendData.size();
+    std::vector<char> nextPacket;
+
+    if (!sendQueue.CompleteSendAndGetNext(
+        completedPacketSize,
+        nextPacket))
+    {
+        return true;
+    }
+
+    return PostSend(std::move(nextPacket));
 }

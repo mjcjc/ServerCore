@@ -1,7 +1,10 @@
 #pragma once
-#include"NetworkCore.h"
+#include "IocpEvent.h"
 #include "SendQueue.h"
-#include"../Common.h"
+#include "../Common.h"
+
+#include <memory>
+#include <vector>
 
 class NetworkCore;
 
@@ -12,7 +15,7 @@ enum class SessionState
     DISCONNECTED
 };
 
-class Session
+class Session : public std::enable_shared_from_this<Session>
 {
 
 public:
@@ -37,17 +40,39 @@ public:
         state = setstate;
     }
     
-    void Process();
+    bool StartAsyncReceive();
+    void HandleIoCompleted(
+        IocpEvent* event,
+        DWORD transferredBytes,
+        DWORD errorCode
+    );
+
     bool Send(const char* packetData, int packetSize);
-    bool FlushSendQueue();
 
     void Disconnect();
 
 private:
+    bool PostRecv();
+    bool HandleRecvCompleted(
+        IocpEvent* event,
+        DWORD transferredBytes
+    );
+    bool ProcessReceivedPackets();
+    bool StartNextSend();
+    bool PostSend(
+        std::vector<char> packet,
+        std::size_t sendOffset = 0
+    );
+    bool HandleSendCompleted(
+        IocpEvent* event,
+        DWORD transferredBytes
+    );
+
     SOCKET client_sock;
     sockaddr_in clientaddr;
-    char buf[BUFSIZE + 1];
     NetworkCore* server;
+
+    std::vector<char> receiveBuffer;
 
     std::mutex sendMutex;
 
@@ -58,4 +83,3 @@ private:
     int userId = 0;
     std::string nickname;
 };
-

@@ -109,7 +109,7 @@ void PacketHandler::HandleLogin(
     );
 
     if (!session->GetServer()->TrySetNickname(
-        session->GetSocket(),
+        session,
         requestedNickname))
     {
         response.success = 0;
