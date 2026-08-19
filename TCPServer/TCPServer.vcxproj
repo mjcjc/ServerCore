@@ -170,6 +170,7 @@
   <ItemGroup>
     <ClCompile Include="DBConnect.cpp" />
     <ClCompile Include="IocpCore.cpp" />
+    <ClCompile Include="MasterClient.cpp" />
     <ClCompile Include="NetworkCore.cpp" />
     <ClCompile Include="PacketHandler.cpp" />
     <ClCompile Include="SendQueue.cpp" />
@@ -183,6 +184,7 @@
     <ClInclude Include="DBConnect.h" />
     <ClInclude Include="IocpCore.h" />
     <ClInclude Include="IocpEvent.h" />
+    <ClInclude Include="MasterClient.h" />
     <ClInclude Include="NetworkCore.h" />
     <ClInclude Include="PacketHandler.h" />
     <ClInclude Include="PacketHeader.h" />

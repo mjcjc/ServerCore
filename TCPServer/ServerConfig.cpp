@@ -90,6 +90,32 @@ bool ServerConfig::Parse(int argc, char* argv[], ServerConfig& config, std::stri
 
             config.workerCount = static_cast<std::uint32_t>(value);
         }
+        else if (argument == "--master-ip")
+        {
+            config.masterIp = valueText;
+        }
+        else if (argument == "--master-port")
+        {
+            unsigned long value = 0;
+            if (!ParseUnsigned(valueText, 65535, value))
+            {
+                error = "Invalid master port: " + std::string(valueText);
+                return false;
+            }
+
+            config.masterPort = static_cast<std::uint16_t>(value);
+        }
+        else if (argument == "--max-sessions")
+        {
+            unsigned long value = 0;
+            if (!ParseUnsigned(valueText, std::numeric_limits<std::uint32_t>::max(), value))
+            {
+                error = "Invalid max sessions: " + std::string(valueText);
+                return false;
+            }
+
+            config.maxSessions = static_cast<std::uint32_t>(value);
+        }
         else
         {
             error = "Unknown argument: " + argument;
@@ -103,5 +129,6 @@ bool ServerConfig::Parse(int argc, char* argv[], ServerConfig& config, std::stri
 const char* ServerConfig::Usage()
 {
     return "Usage: TCPServer.exe [--server-id N] [--bind-ip IPv4] "
-           "[--port N] [--worker-count N] [--skip-db]";
+           "[--port N] [--worker-count N] [--master-ip IPv4] "
+           "[--master-port N] [--max-sessions N] [--skip-db]";
 }

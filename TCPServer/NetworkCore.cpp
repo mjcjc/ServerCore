@@ -181,8 +181,7 @@ void NetworkCore::AddClient(const std::shared_ptr<Session>& session)
 void NetworkCore::RemoveClient(const Session* targetSession)
 {
     std::lock_guard<std::mutex> lock(mtx);
-    sessions.erase(std::remove_if(sessions.begin(),
-                                  sessions.end(),
+    sessions.erase(std::remove_if(sessions.begin(),sessions.end(),
                                   [targetSession](const std::shared_ptr<Session>& session)
                                   {
                                       return session.get() == targetSession;
@@ -210,4 +209,10 @@ void NetworkCore::Broadcast(const Session* senderSession, const char* packetData
             session->Disconnect();
         }
     }
+}
+
+std::uint32_t NetworkCore::GetSessionCount() const
+{
+    std::lock_guard<std::mutex> lock(mtx);
+    return static_cast<std::uint32_t>(sessions.size());
 }

@@ -1,10 +1,13 @@
 #include "..\Common.h"
 #include "DBConnect.h"
+#include "MasterClient.h"
 #include "NetworkCore.h"
 #include "ServerConfig.h"
 
 int main(int argc, char* argv[])
 {
+    setvbuf(stdout, nullptr, _IONBF, 0);
+
     ServerConfig serverConfig;
     std::string configError;
 
@@ -54,7 +57,11 @@ int main(int argc, char* argv[])
            serverConfig.port,
            serverConfig.workerCount);
 
+    MasterClient masterClient(serverConfig, server);
+    masterClient.Start();
+
     server.Run();
+    masterClient.Stop();
     server.closeSock();
 
     return 0;

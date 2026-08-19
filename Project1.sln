@@ -11,6 +11,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SendQueueTests", "TCPServer
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TCPStressClient", "TCPStressClient\TCPStressClient.vcxproj", "{A7453F0B-4E9B-42E9-B1FA-C3D95AF2A371}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MasterServer", "MasterServer\MasterServer.vcxproj", "{4D46D9F2-2AB7-4D57-A0ED-97B6679568A9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -49,6 +51,12 @@ Global
 		{A7453F0B-4E9B-42E9-B1FA-C3D95AF2A371}.Release|x64.ActiveCfg = Release|x64
 		{A7453F0B-4E9B-42E9-B1FA-C3D95AF2A371}.Release|x64.Build.0 = Release|x64
 		{A7453F0B-4E9B-42E9-B1FA-C3D95AF2A371}.Release|x86.ActiveCfg = Release|x64
+		{4D46D9F2-2AB7-4D57-A0ED-97B6679568A9}.Debug|x64.ActiveCfg = Debug|x64
+		{4D46D9F2-2AB7-4D57-A0ED-97B6679568A9}.Debug|x64.Build.0 = Debug|x64
+		{4D46D9F2-2AB7-4D57-A0ED-97B6679568A9}.Debug|x86.ActiveCfg = Debug|x64
+		{4D46D9F2-2AB7-4D57-A0ED-97B6679568A9}.Release|x64.ActiveCfg = Release|x64
+		{4D46D9F2-2AB7-4D57-A0ED-97B6679568A9}.Release|x64.Build.0 = Release|x64
+		{4D46D9F2-2AB7-4D57-A0ED-97B6679568A9}.Release|x86.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -3,28 +3,104 @@
 #include "SocketUtils.h"
 #include "PacketHeader.h"
 #include "PacketType.h"
-char* SERVERIP = (char*)"127.0.0.1";
-#define SERVERPORT 9000
+#include "../MasterServer/MasterProtocol.h"
+
+#include <string>
+
 #define BUFSIZE 512
+
+namespace
+{
+    constexpr std::uint16_t MASTER_PORT = 6000;
+
+    bool RequestGameServer(const char* masterIp, std::string& gameServerIp,
+                           std::uint16_t& gameServerPort, std::uint32_t& gameServerId)
+    {
+        const SOCKET masterSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+        if (masterSocket == INVALID_SOCKET)
+        {
+            return false;
+        }
+
+        sockaddr_in masterAddress{};
+        masterAddress.sin_family = AF_INET;
+        masterAddress.sin_port = htons(MASTER_PORT);
+
+        if (inet_pton(AF_INET, masterIp, &masterAddress.sin_addr) != 1 ||
+            connect(masterSocket,
+                    reinterpret_cast<sockaddr*>(&masterAddress),
+                    sizeof(masterAddress)) == SOCKET_ERROR)
+        {
+            closesocket(masterSocket);
+            return false;
+        }
+
+        MasterMessage request;
+        request.type = static_cast<std::uint16_t>(MasterMessageType::ALLOCATION_REQUEST);
+
+        if (!SocketUtils::SendAll(
+                masterSocket, reinterpret_cast<const char*>(&request), sizeof(request)))
+        {
+            closesocket(masterSocket);
+            return false;
+        }
+
+        MasterMessage response;
+        const bool received = SocketUtils::RecvAll(
+            masterSocket, reinterpret_cast<char*>(&response), sizeof(response));
+        closesocket(masterSocket);
+
+        if (!received || response.size != sizeof(MasterMessage) ||
+            response.type !=
+                static_cast<std::uint16_t>(MasterMessageType::ALLOCATION_RESPONSE) ||
+            response.success == 0)
+        {
+            return false;
+        }
+
+        gameServerIp = response.ip;
+        gameServerPort = response.port;
+        gameServerId = response.serverId;
+        return true;
+    }
+}
 
 int main(int argc, char* argv[])
 {
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
+
     int retval;
 
-    // ¸í·ÉÇà ÀÎ¼ö°¡ ÀÖÀ¸¸é IP ÁÖ¼Ò·Î »ç¿ë
-    if (argc > 1)
-    {
-        SERVERIP = argv[1];
-    }
+    const char* masterIp = argc > 1 ? argv[1] : "127.0.0.1";
 
-    // À©¼Ó ÃÊ±âÈ­
+    // ìœˆì† ì´ˆê¸°í™”
     WSADATA wsa;
     if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
     {
         return 1;
     }
 
-    // ¼ÒÄÏ »ı¼º
+    std::string gameServerIp;
+    std::uint16_t gameServerPort = 0;
+    std::uint32_t gameServerId = 0;
+
+    if (!RequestGameServer(masterIp, gameServerIp, gameServerPort, gameServerId))
+    {
+        printf("[Allocator] Failed to receive an available GameServer from %s:%u.\n",
+               masterIp,
+               MASTER_PORT);
+        WSACleanup();
+        return 1;
+    }
+
+    printf("[Allocator] Assigned GameServer %u at %s:%u.\n",
+           gameServerId,
+           gameServerIp.c_str(),
+           gameServerPort);
+
+    // ì†Œì¼“ ìƒì„±
     SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock == INVALID_SOCKET)
     {
@@ -35,8 +111,8 @@ int main(int argc, char* argv[])
     struct sockaddr_in serveraddr;
     memset(&serveraddr, 0, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
-    inet_pton(AF_INET, SERVERIP, &serveraddr.sin_addr);
-    serveraddr.sin_port = htons(SERVERPORT);
+    inet_pton(AF_INET, gameServerIp.c_str(), &serveraddr.sin_addr);
+    serveraddr.sin_port = htons(gameServerPort);
 
     retval = connect(sock, (struct sockaddr*)&serveraddr, sizeof(serveraddr));
     if (retval == SOCKET_ERROR)
@@ -49,7 +125,7 @@ int main(int argc, char* argv[])
 
     loginRequest.header.type = static_cast<uint16_t>(PacketType::LOGIN_REQUEST);
 
-    printf("´Ğ³×ÀÓ ÀÔ·Â: ");
+    printf("ë‹‰ë„¤ì„ ì…ë ¥: ");
 
     if (fgets(loginRequest.nickname, sizeof(loginRequest.nickname), stdin) == nullptr)
     {
@@ -67,7 +143,7 @@ int main(int argc, char* argv[])
 
     if (strlen(loginRequest.nickname) == 0)
     {
-        printf("[¿À·ù] ´Ğ³×ÀÓÀÌ ºñ¾î ÀÖ½À´Ï´Ù.\n");
+        printf("[ì˜¤ë¥˜] ë‹‰ë„¤ì„ì´ ë¹„ì–´ ìˆìŠµë‹ˆë‹¤.\n");
 
         closesocket(sock);
         WSACleanup();
@@ -77,14 +153,14 @@ int main(int argc, char* argv[])
     if (!SocketUtils::SendAll(
             sock, reinterpret_cast<const char*>(&loginRequest), sizeof(loginRequest)))
     {
-        err_quit("·Î±×ÀÎ ¿äÃ» Àü¼Û");
+        err_quit("ë¡œê·¸ì¸ ìš”ì²­ ì „ì†¡");
     }
     LoginResponse loginResponse{};
 
     if (!SocketUtils::RecvAll(
             sock, reinterpret_cast<char*>(&loginResponse.header), sizeof(PacketHeader)))
     {
-        printf("[¿À·ù] ·Î±×ÀÎ ÀÀ´ä Çì´õ ¼ö½Å ½ÇÆĞ\n");
+        printf("[ì˜¤ë¥˜] ë¡œê·¸ì¸ ì‘ë‹µ í—¤ë” ìˆ˜ì‹  ì‹¤íŒ¨\n");
 
         closesocket(sock);
         WSACleanup();
@@ -93,7 +169,7 @@ int main(int argc, char* argv[])
 
     if (loginResponse.header.type != static_cast<uint16_t>(PacketType::LOGIN_RESPONSE))
     {
-        printf("[¿À·ù] Àß¸øµÈ ·Î±×ÀÎ ÀÀ´ä Å¸ÀÔ: %d\n", loginResponse.header.type);
+        printf("[ì˜¤ë¥˜] ì˜ëª»ëœ ë¡œê·¸ì¸ ì‘ë‹µ íƒ€ì…: %d\n", loginResponse.header.type);
 
         closesocket(sock);
         WSACleanup();
@@ -102,7 +178,7 @@ int main(int argc, char* argv[])
 
     if (loginResponse.header.size != sizeof(LoginResponse))
     {
-        printf("[¿À·ù] Àß¸øµÈ ·Î±×ÀÎ ÀÀ´ä Å©±â: %d\n", loginResponse.header.size);
+        printf("[ì˜¤ë¥˜] ì˜ëª»ëœ ë¡œê·¸ì¸ ì‘ë‹µ í¬ê¸°: %d\n", loginResponse.header.size);
 
         closesocket(sock);
         WSACleanup();
@@ -114,7 +190,7 @@ int main(int argc, char* argv[])
     if (!SocketUtils::RecvAll(
             sock, reinterpret_cast<char*>(&loginResponse) + sizeof(PacketHeader), responseBodySize))
     {
-        printf("[¿À·ù] ·Î±×ÀÎ ÀÀ´ä ¹Ùµğ ¼ö½Å ½ÇÆĞ\n");
+        printf("[ì˜¤ë¥˜] ë¡œê·¸ì¸ ì‘ë‹µ ë°”ë”” ìˆ˜ì‹  ì‹¤íŒ¨\n");
 
         closesocket(sock);
         WSACleanup();
@@ -123,21 +199,20 @@ int main(int argc, char* argv[])
 
     if (loginResponse.success == 0)
     {
-        printf("[·Î±×ÀÎ ½ÇÆĞ] ÀÌ¹Ì »ç¿ë ÁßÀÌ°Å³ª Àß¸øµÈ ´Ğ³×ÀÓÀÔ´Ï´Ù.\n");
+        printf("[ë¡œê·¸ì¸ ì‹¤íŒ¨] ì´ë¯¸ ì‚¬ìš© ì¤‘ì´ê±°ë‚˜ ì˜ëª»ëœ ë‹‰ë„¤ì„ì…ë‹ˆë‹¤.\n");
 
         closesocket(sock);
         WSACleanup();
         return 1;
     }
 
-    printf("[·Î±×ÀÎ ¼º°ø] ¹ß±ŞµÈ User ID: %d\n", loginResponse.userId);
-    // µ¥ÀÌÅÍ Åë½Å¿¡ »ç¿ëÇÒ º¯¼ö
+    printf("[ë¡œê·¸ì¸ ì„±ê³µ] ë°œê¸‰ëœ User ID: %d\n", loginResponse.userId);
+    // ë°ì´í„° í†µì‹ ì— ì‚¬ìš©í•  ë³€ìˆ˜
     char buf[BUFSIZE + 1];
-    int len;
 
     std::atomic<bool> running = true;
 
-    // ¼ö½Å ½º·¹µå: ¼­¹ö¿¡¼­ ¿À´Â µ¥ÀÌÅÍ¸¦ °è¼Ó ¹ŞÀ½
+    // ìˆ˜ì‹  ìŠ¤ë ˆë“œ: ì„œë²„ì—ì„œ ì˜¤ëŠ” ë°ì´í„°ë¥¼ ê³„ì† ë°›ìŒ
     std::thread recv_thread(
         [&]()
         {
@@ -145,34 +220,34 @@ int main(int argc, char* argv[])
             {
                 PacketHeader header{};
 
-                // Çì´õ ¼ö½Å
+                // í—¤ë” ìˆ˜ì‹ 
                 if (!SocketUtils::RecvAll(
                         sock, reinterpret_cast<char*>(&header), sizeof(PacketHeader)))
                 {
                     break;
                 }
 
-                // ÆĞÅ¶ Å©±â °Ë»ç
+                // íŒ¨í‚· í¬ê¸° ê²€ì‚¬
                 if (header.size < sizeof(PacketHeader))
                 {
-                    printf("\n[¿À·ù] Àß¸øµÈ ÆĞÅ¶ Å©±âÀÔ´Ï´Ù.\n");
+                    printf("\n[ì˜¤ë¥˜] ì˜ëª»ëœ íŒ¨í‚· í¬ê¸°ì…ë‹ˆë‹¤.\n");
                     break;
                 }
 
                 if (header.size > BUFSIZE)
                 {
-                    printf("\n[¿À·ù] ÆĞÅ¶ Å©±â°¡ ³Ê¹« Å®´Ï´Ù.\n");
+                    printf("\n[ì˜¤ë¥˜] íŒ¨í‚· í¬ê¸°ê°€ ë„ˆë¬´ í½ë‹ˆë‹¤.\n");
                     break;
                 }
 
                 int bodySize = header.size - sizeof(PacketHeader);
 
-                // Çì´õ¿Í ¹Ùµğ¸¦ ÇÕÃÄ¼­ ÀúÀåÇÒ ÀüÃ¼ ÆĞÅ¶ ¹öÆÛ
+                // í—¤ë”ì™€ ë°”ë””ë¥¼ í•©ì³ì„œ ì €ì¥í•  ì „ì²´ íŒ¨í‚· ë²„í¼
                 char packet[BUFSIZE + 1]{};
 
                 memcpy(packet, &header, sizeof(PacketHeader));
 
-                // ¹Ùµğ ¼ö½Å
+                // ë°”ë”” ìˆ˜ì‹ 
                 if (!SocketUtils::RecvAll(sock, packet + sizeof(PacketHeader), bodySize))
                 {
                     break;
@@ -184,7 +259,7 @@ int main(int argc, char* argv[])
                 {
                     if (header.size != sizeof(ChatResponse))
                     {
-                        printf("\n[¿À·ù] Àß¸øµÈ Ã¤ÆÃ ÀÀ´ä Å©±âÀÔ´Ï´Ù. "
+                        printf("\n[ì˜¤ë¥˜] ì˜ëª»ëœ ì±„íŒ… ì‘ë‹µ í¬ê¸°ì…ë‹ˆë‹¤. "
                                "size=%d\n",
                                header.size);
 
@@ -198,11 +273,11 @@ int main(int argc, char* argv[])
 
                     size_t messageLength = strnlen_s(response->message, sizeof(response->message));
 
-                    // ¹è¿­ ³»ºÎ¿¡ ³Î ¹®ÀÚ°¡ ¾ø´Â Àß¸øµÈ ÆĞÅ¶
+                    // ë°°ì—´ ë‚´ë¶€ì— ë„ ë¬¸ìê°€ ì—†ëŠ” ì˜ëª»ëœ íŒ¨í‚·
                     if (nicknameLength >= sizeof(response->nickname) ||
                         messageLength >= sizeof(response->message))
                     {
-                        printf("\n[¿À·ù] Àß¸øµÈ Ã¤ÆÃ ÀÀ´äÀÔ´Ï´Ù.\n");
+                        printf("\n[ì˜¤ë¥˜] ì˜ëª»ëœ ì±„íŒ… ì‘ë‹µì…ë‹ˆë‹¤.\n");
 
                         break;
                     }
@@ -212,7 +287,7 @@ int main(int argc, char* argv[])
                            response->userId,
                            response->message);
 
-                    printf("[º¸³¾ µ¥ÀÌÅÍ] ");
+                    printf("[ë³´ë‚¼ ë°ì´í„°] ");
                     fflush(stdout);
 
                     break;
@@ -220,7 +295,7 @@ int main(int argc, char* argv[])
 
                 default:
                 {
-                    printf("\n[¿À·ù] ¾Ë ¼ö ¾ø´Â ÆĞÅ¶ Å¸ÀÔÀÔ´Ï´Ù. "
+                    printf("\n[ì˜¤ë¥˜] ì•Œ ìˆ˜ ì—†ëŠ” íŒ¨í‚· íƒ€ì…ì…ë‹ˆë‹¤. "
                            "type=%d\n",
                            header.type);
 
@@ -231,10 +306,10 @@ int main(int argc, char* argv[])
 
             running = false;
         });
-    // ¼Û½Å ·çÇÁ: Å°º¸µå ÀÔ·ÂÀ» ¹Ş¾Æ ¼­¹ö·Î º¸³¿
+    // ì†¡ì‹  ë£¨í”„: í‚¤ë³´ë“œ ì…ë ¥ì„ ë°›ì•„ ì„œë²„ë¡œ ë³´ëƒ„
     while (running)
     {
-        printf("\n[º¸³¾ µ¥ÀÌÅÍ] ");
+        printf("\n[ë³´ë‚¼ ë°ì´í„°] ");
 
         if (fgets(buf, BUFSIZE + 1, stdin) == nullptr)
         {
@@ -243,14 +318,14 @@ int main(int argc, char* argv[])
 
         size_t messageLength = strlen(buf);
 
-        // fgets()°¡ ÀÔ·ÂÇÑ ¸¶Áö¸· °³Çà ¹®ÀÚ Á¦°Å
+        // fgets()ê°€ ì…ë ¥í•œ ë§ˆì§€ë§‰ ê°œí–‰ ë¬¸ì ì œê±°
         if (messageLength > 0 && buf[messageLength - 1] == '\n')
         {
             buf[messageLength - 1] = '\0';
             --messageLength;
         }
 
-        // ºó ¸Ş½ÃÁö´Â Àü¼ÛÇÏÁö ¾ÊÀ½
+        // ë¹ˆ ë©”ì‹œì§€ëŠ” ì „ì†¡í•˜ì§€ ì•ŠìŒ
         if (messageLength == 0)
         {
             continue;
@@ -258,10 +333,10 @@ int main(int argc, char* argv[])
 
         ChatRequest request{};
 
-        // message[256]¿¡ µé¾î°¥ ¼ö ÀÖ´ÂÁö °Ë»ç
+        // message[256]ì— ë“¤ì–´ê°ˆ ìˆ˜ ìˆëŠ”ì§€ ê²€ì‚¬
         if (messageLength >= sizeof(request.message))
         {
-            printf("[¿À·ù] ¸Ş½ÃÁö´Â ÃÖ´ë %zu¹ÙÀÌÆ®±îÁö °¡´ÉÇÕ´Ï´Ù.\n", sizeof(request.message) - 1);
+            printf("[ì˜¤ë¥˜] ë©”ì‹œì§€ëŠ” ìµœëŒ€ %zuë°”ì´íŠ¸ê¹Œì§€ ê°€ëŠ¥í•©ë‹ˆë‹¤.\n", sizeof(request.message) - 1);
 
             continue;
         }
@@ -279,13 +354,13 @@ int main(int argc, char* argv[])
             break;
         }
 
-        printf("[TCP Å¬¶óÀÌ¾ğÆ®] %zu¹ÙÀÌÆ®¸¦ º¸³Â½À´Ï´Ù.\n", sizeof(ChatRequest));
+        printf("[TCP í´ë¼ì´ì–¸íŠ¸] %zuë°”ì´íŠ¸ë¥¼ ë³´ëƒˆìŠµë‹ˆë‹¤.\n", sizeof(ChatRequest));
     }
 
-    // Á¾·á Ã³¸®
+    // ì¢…ë£Œ ì²˜ë¦¬
     running = false;
 
-    // recv()¿¡¼­ ´ë±â ÁßÀÎ ¼ö½Å ½º·¹µå¸¦ ±ú¿ì±â À§ÇØ shutdown
+    // recv()ì—ì„œ ëŒ€ê¸° ì¤‘ì¸ ìˆ˜ì‹  ìŠ¤ë ˆë“œë¥¼ ê¹¨ìš°ê¸° ìœ„í•´ shutdown
     shutdown(sock, SD_BOTH);
 
     if (recv_thread.joinable())
@@ -293,10 +368,10 @@ int main(int argc, char* argv[])
         recv_thread.join();
     }
 
-    // ¼ÒÄÏ ´İ±â
+    // ì†Œì¼“ ë‹«ê¸°
     closesocket(sock);
 
-    // À©¼Ó Á¾·á
+    // ìœˆì† ì¢…ë£Œ
     WSACleanup();
 
     return 0;

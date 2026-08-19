@@ -31,6 +31,7 @@ class NetworkCore
     sockaddr_in clientaddr;
 
     bool TrySetNickname(Session* senderSession, const std::string& nickname);
+    std::uint32_t GetSessionCount() const;
 
     int retval;
 
@@ -38,5 +39,5 @@ class NetworkCore
     ServerConfig config;
     IocpCore iocpCore;
     std::vector<std::shared_ptr<Session>> sessions;
-    std::mutex mtx;
+    mutable std::mutex mtx;
 };

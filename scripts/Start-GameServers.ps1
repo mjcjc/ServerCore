@@ -5,9 +5,14 @@ param(
     [switch]$WithDatabase
 )
 
-$resolvedExecutable = [System.IO.Path]::GetFullPath(
-    (Join-Path $PSScriptRoot $Executable)
-)
+if ([System.IO.Path]::IsPathRooted($Executable)) {
+    $resolvedExecutable = [System.IO.Path]::GetFullPath($Executable)
+}
+else {
+    $resolvedExecutable = [System.IO.Path]::GetFullPath(
+        (Join-Path $PSScriptRoot $Executable)
+    )
+}
 
 if (-not (Test-Path -LiteralPath $resolvedExecutable)) {
     throw "TCPServer executable was not found: $resolvedExecutable"
@@ -24,6 +29,20 @@ $servers = @(
 )
 
 foreach ($server in $servers) {
+    $listener = Get-NetTCPConnection `
+        -State Listen `
+        -LocalPort $server.Port `
+        -ErrorAction SilentlyContinue
+
+    if ($null -ne $listener) {
+        $processId = $listener | Select-Object -First 1 -ExpandProperty OwningProcess
+        $processName = Get-Process -Id $processId -ErrorAction SilentlyContinue |
+            Select-Object -ExpandProperty ProcessName
+
+        Write-Host "GameServer $($server.Id) was not started: port $($server.Port) is already used by $processName (PID $processId)."
+        continue
+    }
+
     $arguments = @(
         "--server-id", $server.Id,
         "--bind-ip", "127.0.0.1",
@@ -39,4 +58,6 @@ foreach ($server in $servers) {
         -FilePath $resolvedExecutable `
         -ArgumentList $arguments `
         -WorkingDirectory (Split-Path -Parent $resolvedExecutable)
+
+    Write-Host "GameServer $($server.Id) started on port $($server.Port)."
 }
