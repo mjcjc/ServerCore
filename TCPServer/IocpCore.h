@@ -10,13 +10,9 @@
 
 class IocpCore
 {
-public:
+  public:
     using CompletionHandler = std::function<void(
-        DWORD transferredBytes,
-        ULONG_PTR completionKey,
-        OVERLAPPED* overlapped,
-        DWORD errorCode
-    )>;
+        DWORD transferredBytes, ULONG_PTR completionKey, OVERLAPPED* overlapped, DWORD errorCode)>;
 
     IocpCore() = default;
     ~IocpCore();
@@ -24,21 +20,15 @@ public:
     IocpCore(const IocpCore&) = delete;
     IocpCore& operator=(const IocpCore&) = delete;
 
-    bool Start(
-        std::size_t workerCount,
-        CompletionHandler completionHandler
-    );
+    bool Start(std::size_t workerCount, CompletionHandler completionHandler);
 
     // Registers a socket with the existing completion port.
     // This does not create another IOCP object.
-    bool RegisterSocket(
-        SOCKET socket,
-        ULONG_PTR completionKey
-    );
+    bool RegisterSocket(SOCKET socket, ULONG_PTR completionKey);
 
     void Stop();
 
-private:
+  private:
     void WorkerLoop();
 
     HANDLE completionPort = nullptr;

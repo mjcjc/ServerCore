@@ -1,0 +1,42 @@
+param(
+    [string]$Executable = "..\x64\Debug\TCPServer.exe",
+    [int]$WorkerCount = 4,
+    [string]$ConnectorDllDirectory = "C:\Program Files\MySQL\MySQL Connector C++ 9.5\lib64",
+    [switch]$WithDatabase
+)
+
+$resolvedExecutable = [System.IO.Path]::GetFullPath(
+    (Join-Path $PSScriptRoot $Executable)
+)
+
+if (-not (Test-Path -LiteralPath $resolvedExecutable)) {
+    throw "TCPServer executable was not found: $resolvedExecutable"
+}
+
+if (Test-Path -LiteralPath $ConnectorDllDirectory) {
+    $env:PATH = $ConnectorDllDirectory + ";" + $env:PATH
+}
+
+$servers = @(
+    @{ Id = 1; Port = 7001 },
+    @{ Id = 2; Port = 7002 },
+    @{ Id = 3; Port = 7003 }
+)
+
+foreach ($server in $servers) {
+    $arguments = @(
+        "--server-id", $server.Id,
+        "--bind-ip", "127.0.0.1",
+        "--port", $server.Port,
+        "--worker-count", $WorkerCount
+    )
+
+    if (-not $WithDatabase) {
+        $arguments += "--skip-db"
+    }
+
+    Start-Process `
+        -FilePath $resolvedExecutable `
+        -ArgumentList $arguments `
+        -WorkingDirectory (Split-Path -Parent $resolvedExecutable)
+}

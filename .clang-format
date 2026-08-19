@@ -1,0 +1,31 @@
+---
+Language: Cpp
+BasedOnStyle: Microsoft
+
+IndentWidth: 4
+ContinuationIndentWidth: 4
+TabWidth: 4
+UseTab: Never
+
+BreakBeforeBraces: Allman
+NamespaceIndentation: All
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+AllowShortBlocksOnASingleLine: Never
+AllowShortEnumsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLambdasOnASingleLine: None
+AllowShortLoopsOnASingleLine: false
+InsertBraces: true
+
+ColumnLimit: 0
+BinPackArguments: true
+BinPackParameters: true
+AlignAfterOpenBracket: Align
+
+SortIncludes: Never
+IncludeBlocks: Preserve
+FixNamespaceComments: false
+...

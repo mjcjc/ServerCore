@@ -11,20 +11,11 @@ struct LoginRequest;
 
 class PacketHandler
 {
-public:
-    static void HandlePacket(
-        Session* session,
-        const char* packet
-    );
+  public:
+    static void HandlePacket(Session* session, const char* packet);
 
-private:
-    static void HandleLogin(
-        Session* session,
-        const LoginRequest* packet
-    );
+  private:
+    static void HandleLogin(Session* session, const LoginRequest* packet);
 
-    static void HandleChat(
-        Session* session,
-        const ChatRequest* packet
-    );
+    static void HandleChat(Session* session, const ChatRequest* packet);
 };

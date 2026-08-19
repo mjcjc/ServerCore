@@ -7,23 +7,14 @@ IocpCore::~IocpCore()
     Stop();
 }
 
-bool IocpCore::Start(
-    std::size_t workerCount,
-    CompletionHandler completionHandler)
+bool IocpCore::Start(std::size_t workerCount, CompletionHandler completionHandler)
 {
-    if (workerCount == 0 ||
-        !completionHandler ||
-        isRunning.load())
+    if (workerCount == 0 || !completionHandler || isRunning.load())
     {
         return false;
     }
 
-    completionPort = CreateIoCompletionPort(
-        INVALID_HANDLE_VALUE,
-        nullptr,
-        0,
-        0
-    );
+    completionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 0);
 
     if (completionPort == nullptr)
     {
@@ -50,21 +41,15 @@ bool IocpCore::Start(
     return true;
 }
 
-bool IocpCore::RegisterSocket(
-    SOCKET socket,
-    ULONG_PTR completionKey)
+bool IocpCore::RegisterSocket(SOCKET socket, ULONG_PTR completionKey)
 {
     if (!isRunning.load() || socket == INVALID_SOCKET)
     {
         return false;
     }
 
-    HANDLE result = CreateIoCompletionPort(
-        reinterpret_cast<HANDLE>(socket),
-        completionPort,
-        completionKey,
-        0
-    );
+    HANDLE result =
+        CreateIoCompletionPort(reinterpret_cast<HANDLE>(socket), completionPort, completionKey, 0);
 
     return result == completionPort;
 }
@@ -78,12 +63,7 @@ void IocpCore::Stop()
 
     for (std::size_t index = 0; index < workers.size(); ++index)
     {
-        PostQueuedCompletionStatus(
-            completionPort,
-            0,
-            0,
-            nullptr
-        );
+        PostQueuedCompletionStatus(completionPort, 0, 0, nullptr);
     }
 
     for (std::thread& worker : workers)
@@ -110,12 +90,7 @@ void IocpCore::WorkerLoop()
         OVERLAPPED* overlapped = nullptr;
 
         const BOOL succeeded = GetQueuedCompletionStatus(
-            completionPort,
-            &transferredBytes,
-            &completionKey,
-            &overlapped,
-            INFINITE
-        );
+            completionPort, &transferredBytes, &completionKey, &overlapped, INFINITE);
 
         if (overlapped == nullptr && completionKey == 0)
         {
@@ -127,15 +102,8 @@ void IocpCore::WorkerLoop()
             continue;
         }
 
-        const DWORD errorCode = succeeded
-            ? ERROR_SUCCESS
-            : GetLastError();
+        const DWORD errorCode = succeeded ? ERROR_SUCCESS : GetLastError();
 
-        handler(
-            transferredBytes,
-            completionKey,
-            overlapped,
-            errorCode
-        );
+        handler(transferredBytes, completionKey, overlapped, errorCode);
     }
 }

@@ -16,6 +16,12 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <ClCompile Include="DBConnect.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="ServerConfig.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IocpCore.h">
@@ -42,6 +48,9 @@
     <ClCompile Include="SendQueue.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClInclude Include="DBConnect.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Common.h">
@@ -68,5 +77,13 @@
     <ClInclude Include="SendQueue.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="ServerConfig.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="DB">
+      <UniqueIdentifier>{10a386c3-7708-4751-8c16-35d1fec11d49}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>

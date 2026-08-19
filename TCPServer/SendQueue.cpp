@@ -1,18 +1,13 @@
 #include "SendQueue.h"
 
-EnqueueResult SendQueue::Enqueue(
-    const char* packetData,
-    std::size_t packetSize)
+EnqueueResult SendQueue::Enqueue(const char* packetData, std::size_t packetSize)
 {
-    if (packetData == nullptr ||
-        packetSize == 0)
+    if (packetData == nullptr || packetSize == 0)
     {
         return EnqueueResult::REJECTED;
     }
 
-    std::lock_guard<std::mutex> lock(
-        queueMutex
-    );
+    std::lock_guard<std::mutex> lock(queueMutex);
 
     if (isClosed)
     {
@@ -22,16 +17,12 @@ EnqueueResult SendQueue::Enqueue(
     {
         return EnqueueResult::QUEUE_FULL;
     }
-    
-    if (queuedBytes >
-        MAX_QUEUED_BYTES - packetSize)
+
+    if (queuedBytes > MAX_QUEUED_BYTES - packetSize)
     {
         return EnqueueResult::QUEUE_FULL;
     }
-    packets.emplace(
-        packetData,
-        packetData + packetSize
-    );
+    packets.emplace(packetData, packetData + packetSize);
 
     queuedBytes += packetSize;
 
@@ -45,8 +36,7 @@ EnqueueResult SendQueue::Enqueue(
     return EnqueueResult::START_FLUSHING;
 }
 
-bool SendQueue::TryPop(
-    std::vector<char>& outPacket)
+bool SendQueue::TryPop(std::vector<char>& outPacket)
 {
     std::lock_guard<std::mutex> lock(queueMutex);
 
@@ -62,12 +52,9 @@ bool SendQueue::TryPop(
         return false;
     }
 
-    std::size_t packetSize =
-        packets.front().size();
+    std::size_t packetSize = packets.front().size();
 
-    outPacket = std::move(
-        packets.front()
-    );
+    outPacket = std::move(packets.front());
 
     packets.pop();
 
@@ -83,8 +70,7 @@ bool SendQueue::TryPop(
     return true;
 }
 
-bool SendQueue::TryBeginSend(
-    std::vector<char>& outPacket)
+bool SendQueue::TryBeginSend(std::vector<char>& outPacket)
 {
     std::lock_guard<std::mutex> lock(queueMutex);
 
@@ -100,9 +86,8 @@ bool SendQueue::TryBeginSend(
     return true;
 }
 
-bool SendQueue::CompleteSendAndGetNext(
-    std::size_t completedPacketSize,
-    std::vector<char>& outNextPacket)
+bool SendQueue::CompleteSendAndGetNext(std::size_t completedPacketSize,
+                                       std::vector<char>& outNextPacket)
 {
     std::lock_guard<std::mutex> lock(queueMutex);
 

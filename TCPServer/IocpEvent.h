@@ -17,9 +17,7 @@ enum class IoOperation
 
 struct IocpEvent
 {
-    IocpEvent(
-        IoOperation operation,
-        std::shared_ptr<Session> ownerSession)
+    IocpEvent(IoOperation operation, std::shared_ptr<Session> ownerSession)
         : type(operation), owner(std::move(ownerSession))
     {
         wsabuf.buf = storage.data();
@@ -44,17 +42,14 @@ struct IocpEvent
         return sendOffset >= sendData.size();
     }
 
-private:
+  private:
     void UpdateSendBuffer()
     {
         wsabuf.buf = sendData.data() + sendOffset;
-        wsabuf.len = static_cast<ULONG>(
-            sendData.size() - sendOffset
-        );
+        wsabuf.len = static_cast<ULONG>(sendData.size() - sendOffset);
     }
 
-public:
-
+  public:
     OVERLAPPED overlapped{};
     IoOperation type;
     std::shared_ptr<Session> owner;

@@ -362,3 +362,9 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /TCPServer.zip
+
+# Local vcpkg installation output (restored from vcpkg.json)
+/vcpkg_installed/
+
+# Generated stress-test reports
+/test-results/
