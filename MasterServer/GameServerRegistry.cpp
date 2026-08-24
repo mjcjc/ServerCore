@@ -9,6 +9,8 @@ namespace
     {
         GameServerInfo info;
         info.serverId = message.serverId;
+        info.worldId = message.worldId;
+        info.channelId = message.channelId;
         info.ip = message.ip;
         info.port = message.port;
         info.currentSessions = message.currentSessions;
@@ -25,9 +27,11 @@ void GameServerRegistry::Register(const MasterMessage& message)
     const bool isNewServer = servers.find(message.serverId) == servers.end();
     servers[message.serverId] = CreateServerInfo(message);
 
-    printf("[Registry] GameServer %u %s. Endpoint=%s:%u, Sessions=%u/%u\n",
+    printf("[Registry] GameServer %u %s. World=%u, Channel=%u, Endpoint=%s:%u, Sessions=%u/%u\n",
            message.serverId,
            isNewServer ? "registered" : "re-registered",
+           message.worldId,
+           message.channelId,
            message.ip,
            message.port,
            message.currentSessions,
@@ -50,6 +54,8 @@ void GameServerRegistry::UpdateHeartbeat(const MasterMessage& message)
     const bool wasInactive = !info.active;
     info.ip = message.ip;
     info.port = message.port;
+    info.worldId = message.worldId;
+    info.channelId = message.channelId;
     info.currentSessions = message.currentSessions;
     info.maxSessions = message.maxSessions;
     info.lastHeartbeat = std::chrono::steady_clock::now();
@@ -94,7 +100,8 @@ std::vector<GameServerInfo> GameServerRegistry::GetAll() const
     return result;
 }
 
-std::optional<GameServerInfo> GameServerRegistry::SelectLeastLoaded() const
+std::optional<GameServerInfo> GameServerRegistry::SelectLeastLoaded(std::uint32_t worldId,
+                                                                    std::uint32_t channelId) const
 {
     std::lock_guard<std::mutex> lock(mutex);
     std::optional<GameServerInfo> selected;
@@ -102,6 +109,12 @@ std::optional<GameServerInfo> GameServerRegistry::SelectLeastLoaded() const
     for (const auto& [serverId, info] : servers)
     {
         if (!info.active || info.currentSessions >= info.maxSessions)
+        {
+            continue;
+        }
+
+        if ((worldId != 0 && info.worldId != worldId) ||
+            (channelId != 0 && info.channelId != channelId))
         {
             continue;
         }

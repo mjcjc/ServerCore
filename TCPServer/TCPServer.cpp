@@ -3,6 +3,7 @@
 #include "MasterClient.h"
 #include "NetworkCore.h"
 #include "ServerConfig.h"
+#include "WorldClient.h"
 
 int main(int argc, char* argv[])
 {
@@ -51,16 +52,22 @@ int main(int argc, char* argv[])
     server.bindSock();
     server.listenSock();
 
-    printf("[GameServer %u] Started. Bind=%s, Port=%u, Workers=%u\n",
+    printf("[GameServer %u] Started. World=%u, Channel=%u, Bind=%s, Port=%u, Workers=%u\n",
            serverConfig.serverId,
+           serverConfig.worldId,
+           serverConfig.channelId,
            serverConfig.bindIp.c_str(),
            serverConfig.port,
            serverConfig.workerCount);
 
     MasterClient masterClient(serverConfig, server);
+    WorldClient worldClient(serverConfig, server);
+    server.SetWorldClient(&worldClient);
     masterClient.Start();
+    worldClient.Start();
 
     server.Run();
+    worldClient.Stop();
     masterClient.Stop();
     server.closeSock();
 

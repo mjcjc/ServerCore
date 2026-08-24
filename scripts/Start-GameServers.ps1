@@ -23,9 +23,9 @@ if (Test-Path -LiteralPath $ConnectorDllDirectory) {
 }
 
 $servers = @(
-    @{ Id = 1; Port = 7001 },
-    @{ Id = 2; Port = 7002 },
-    @{ Id = 3; Port = 7003 }
+    @{ Id = 1; WorldId = 1; ChannelId = 1; Port = 7001 },
+    @{ Id = 2; WorldId = 1; ChannelId = 2; Port = 7002 },
+    @{ Id = 3; WorldId = 1; ChannelId = 3; Port = 7003 }
 )
 
 foreach ($server in $servers) {
@@ -45,9 +45,13 @@ foreach ($server in $servers) {
 
     $arguments = @(
         "--server-id", $server.Id,
+        "--world-id", $server.WorldId,
+        "--channel-id", $server.ChannelId,
         "--bind-ip", "127.0.0.1",
         "--port", $server.Port,
-        "--worker-count", $WorkerCount
+        "--worker-count", $WorkerCount,
+        "--world-server-ip", "127.0.0.1",
+        "--world-server-port", 6501
     )
 
     if (-not $WithDatabase) {

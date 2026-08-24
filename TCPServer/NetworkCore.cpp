@@ -1,6 +1,9 @@
 ﻿#include "NetworkCore.h"
 #include "SocketUtils.h"
 #include "Session.h"
+#include "PacketHeader.h"
+#include "PacketType.h"
+#include "WorldClient.h"
 
 #include "IocpEvent.h"
 
@@ -215,4 +218,28 @@ std::uint32_t NetworkCore::GetSessionCount() const
 {
     std::lock_guard<std::mutex> lock(mtx);
     return static_cast<std::uint32_t>(sessions.size());
+}
+
+void NetworkCore::SetWorldClient(WorldClient* client)
+{
+    worldClient = client;
+}
+
+bool NetworkCore::SendWorldChat(std::int32_t userId, const std::string& nickname,
+                                const char* message)
+{
+    return worldClient != nullptr && worldClient->SendWorldChat(userId, nickname, message);
+}
+
+void NetworkCore::BroadcastWorldChat(std::int32_t userId, std::uint32_t channelId,
+                                     const char* nickname, const char* message)
+{
+    WorldChatResponse response{};
+    response.header.size = static_cast<std::uint16_t>(sizeof(response));
+    response.header.type = static_cast<std::uint16_t>(PacketType::WORLD_CHAT_RESPONSE);
+    response.userId = userId;
+    response.channelId = channelId;
+    strncpy_s(response.nickname, nickname, _TRUNCATE);
+    strncpy_s(response.message, message, _TRUNCATE);
+    Broadcast(nullptr, reinterpret_cast<const char*>(&response), sizeof(response));
 }

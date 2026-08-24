@@ -28,7 +28,7 @@
     <ClCompile><WarningLevel>Level3</WarningLevel><Optimization>MaxSpeed</Optimization><FunctionLevelLinking>true</FunctionLevelLinking><IntrinsicFunctions>true</IntrinsicFunctions><SDLCheck>true</SDLCheck><PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions><ConformanceMode>true</ConformanceMode><LanguageStandard>stdcpp17</LanguageStandard></ClCompile>
     <Link><SubSystem>Console</SubSystem><EnableCOMDATFolding>true</EnableCOMDATFolding><OptimizeReferences>true</OptimizeReferences><GenerateDebugInformation>true</GenerateDebugInformation><AdditionalDependencies>ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
   </ItemDefinitionGroup>
-  <ItemGroup><ClCompile Include="GameServerRegistry.cpp" /><ClCompile Include="MasterServer.cpp" /></ItemGroup>
-  <ItemGroup><ClInclude Include="GameServerRegistry.h" /><ClInclude Include="MasterProtocol.h" /></ItemGroup>
+  <ItemGroup><ClCompile Include="GameServerRegistry.cpp" /><ClCompile Include="MasterServer.cpp" /><ClCompile Include="WorldServerRegistry.cpp" /></ItemGroup>
+  <ItemGroup><ClInclude Include="GameServerRegistry.h" /><ClInclude Include="MasterProtocol.h" /><ClInclude Include="WorldServerRegistry.h" /></ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

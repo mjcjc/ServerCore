@@ -13,6 +13,8 @@
 struct GameServerInfo
 {
     std::uint32_t serverId = 0;
+    std::uint32_t worldId = 0;
+    std::uint32_t channelId = 0;
     std::string ip;
     std::uint16_t port = 0;
     std::uint32_t currentSessions = 0;
@@ -29,7 +31,8 @@ class GameServerRegistry
     void MarkTimedOut(std::chrono::seconds timeout);
 
     std::vector<GameServerInfo> GetAll() const;
-    std::optional<GameServerInfo> SelectLeastLoaded() const;
+    std::optional<GameServerInfo> SelectLeastLoaded(std::uint32_t worldId = 0,
+                                                    std::uint32_t channelId = 0) const;
 
   private:
     mutable std::mutex mutex;

@@ -1,4 +1,5 @@
 #include "GameServerRegistry.h"
+#include "WorldServerRegistry.h"
 
 #include <WinSock2.h>
 #include <WS2tcpip.h>
@@ -53,7 +54,8 @@ namespace
         return true;
     }
 
-    void HandleGameServer(SOCKET socket, GameServerRegistry& registry)
+    void HandleServer(SOCKET socket, GameServerRegistry& gameServerRegistry,
+                      WorldServerRegistry& worldServerRegistry)
     {
         MasterMessage message;
 
@@ -67,11 +69,19 @@ namespace
             switch (static_cast<MasterMessageType>(message.type))
             {
             case MasterMessageType::REGISTER_GAME_SERVER:
-                registry.Register(message);
+                gameServerRegistry.Register(message);
                 break;
 
             case MasterMessageType::HEARTBEAT:
-                registry.UpdateHeartbeat(message);
+                gameServerRegistry.UpdateHeartbeat(message);
+                break;
+
+            case MasterMessageType::REGISTER_WORLD_SERVER:
+                worldServerRegistry.Register(message);
+                break;
+
+            case MasterMessageType::WORLD_HEARTBEAT:
+                worldServerRegistry.UpdateHeartbeat(message);
                 break;
 
             case MasterMessageType::ALLOCATION_REQUEST:
@@ -79,12 +89,15 @@ namespace
                 MasterMessage response;
                 response.type =
                     static_cast<std::uint16_t>(MasterMessageType::ALLOCATION_RESPONSE);
-                const auto selected = registry.SelectLeastLoaded();
+                const auto selected = gameServerRegistry.SelectLeastLoaded(message.worldId,
+                                                                            message.channelId);
 
                 if (selected)
                 {
                     response.success = 1;
                     response.serverId = selected->serverId;
+                    response.worldId = selected->worldId;
+                    response.channelId = selected->channelId;
                     strncpy_s(response.ip, selected->ip.c_str(), _TRUNCATE);
                     response.port = selected->port;
                     response.currentSessions = selected->currentSessions;
@@ -155,13 +168,15 @@ int main()
     }
 
     GameServerRegistry registry;
+    WorldServerRegistry worldServerRegistry;
     std::atomic<bool> running{true};
-    std::thread monitor([&registry, &running]()
+    std::thread monitor([&registry, &worldServerRegistry, &running]()
     {
         while (running.load())
         {
             std::this_thread::sleep_for(std::chrono::seconds(1));
             registry.MarkTimedOut(HEARTBEAT_TIMEOUT);
+            worldServerRegistry.MarkTimedOut(HEARTBEAT_TIMEOUT);
         }
     });
 
@@ -177,7 +192,10 @@ int main()
             break;
         }
 
-        std::thread(HandleGameServer, clientSocket, std::ref(registry)).detach();
+        std::thread(HandleServer,
+                    clientSocket,
+                    std::ref(registry),
+                    std::ref(worldServerRegistry)).detach();
     }
 
     running.store(false);

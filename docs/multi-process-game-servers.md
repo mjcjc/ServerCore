@@ -48,6 +48,33 @@ registration, health checks, and load-aware routing will be added later through
 the Master Server.
 # MasterServer 등록 구조
 
+## WorldServer 등록
+
+`WorldServer 1`은 월드 ID 1과 `127.0.0.1:6501`을 MasterServer에 등록하고
+2초마다 Heartbeat를 보낸다. MasterServer는 GameServer와 별도의 Registry에서
+WorldServer 상태를 관리하며 5초간 Heartbeat가 없으면 비활성 처리한다.
+
+각 GameServer는 `worldId=1`과 서로 다른 `channelId`를 가지고 WorldServer에도
+등록한다. WorldServer는 연결된 채널 서버의 Heartbeat와 현재 접속자 수를 별도로
+관리한다.
+
+```text
+WorldServer 1 (World 1)
+ ├─ GameServer 1 / Channel 1 / 7001
+ ├─ GameServer 2 / Channel 2 / 7002
+ └─ GameServer 3 / Channel 3 / 7003
+```
+
+```text
+                 MasterServer (6000)
+                    │       │
+      등록/Heartbeat│       │등록/Heartbeat
+                    │       │
+          WorldServer 1     GameServer 1~3
+             World 1         Port 7001~7003
+             Port 6501
+```
+
 `MasterServer`는 `127.0.0.1:6000`에서 GameServer 관리 연결을 받는다.
 각 GameServer는 시작할 때 자신의 ID, 접속 주소, 수용 인원을 등록하고 2초마다
 현재 접속자 수를 Heartbeat로 보낸다. MasterServer는 5초 동안 Heartbeat가 없으면

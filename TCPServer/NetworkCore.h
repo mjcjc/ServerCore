@@ -9,6 +9,7 @@
 #include <vector>
 
 class Session;
+class WorldClient;
 
 class NetworkCore
 {
@@ -24,6 +25,10 @@ class NetworkCore
     void AddClient(const std::shared_ptr<Session>& session);
     void RemoveClient(const Session* targetSession);
     void Broadcast(const Session* senderSession, const char* packetData, int packetSize);
+    void SetWorldClient(WorldClient* client);
+    bool SendWorldChat(std::int32_t userId, const std::string& nickname, const char* message);
+    void BroadcastWorldChat(std::int32_t userId, std::uint32_t channelId,
+                            const char* nickname, const char* message);
 
     SOCKET AcceptClient(sockaddr_in& clientaddr);
     SOCKET listen_sock;
@@ -40,4 +45,5 @@ class NetworkCore
     IocpCore iocpCore;
     std::vector<std::shared_ptr<Session>> sessions;
     mutable std::mutex mtx;
+    WorldClient* worldClient = nullptr;
 };

@@ -89,6 +89,8 @@ void MasterClient::Run()
         MasterMessage message;
         message.type = static_cast<std::uint16_t>(MasterMessageType::REGISTER_GAME_SERVER);
         message.serverId = config.serverId;
+        message.worldId = config.worldId;
+        message.channelId = config.channelId;
         strncpy_s(message.ip, config.bindIp.c_str(), _TRUNCATE);
         message.port = config.port;
         message.currentSessions = server.GetSessionCount();

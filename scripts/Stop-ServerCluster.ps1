@@ -1,4 +1,4 @@
-$clusterPorts = @(6000, 7001, 7002, 7003)
+$clusterPorts = @(6000, 6501, 7001, 7002, 7003)
 $listeners = Get-NetTCPConnection `
     -State Listen `
     -ErrorAction SilentlyContinue |
@@ -12,7 +12,7 @@ if ($null -eq $listeners) {
 $processes = $listeners |
     Select-Object -ExpandProperty OwningProcess -Unique |
     ForEach-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue } |
-    Where-Object { $_.ProcessName -in @("MasterServer", "TCPServer") }
+    Where-Object { $_.ProcessName -in @("MasterServer", "WorldServer", "TCPServer") }
 
 foreach ($process in $processes) {
     Write-Host "Stopping $($process.ProcessName) (PID $($process.Id))..."

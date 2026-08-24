@@ -29,9 +29,16 @@ void PacketHandler::HandlePacket(Session* session, const char* packet)
         break;
     }
 
+    case PacketType::WORLD_CHAT_REQUEST:
+    {
+        const WorldChatRequest* request = reinterpret_cast<const WorldChatRequest*>(packet);
+        HandleWorldChat(session, request);
+        break;
+    }
+
     default:
     {
-        printf("[¿À·ù] ¾Ë ¼ö ¾ø´Â ÆĞÅ¶ Å¸ÀÔ: %d\n", header->type);
+        printf("[ì˜¤ë¥˜] ì•Œ ìˆ˜ ì—†ëŠ” íŒ¨í‚· íƒ€ì…: %d\n", header->type);
 
         break;
     }
@@ -42,14 +49,14 @@ void PacketHandler::HandleLogin(Session* session, const LoginRequest* packet)
 {
     if (session->GetState() != SessionState::CONNECTED)
     {
-        printf("[·Î±×ÀÎ ½ÇÆĞ] ÀÌ¹Ì ·Î±×ÀÎµÈ ¼¼¼ÇÀÔ´Ï´Ù.\n");
+        printf("[ë¡œê·¸ì¸ ì‹¤íŒ¨] ì´ë¯¸ ë¡œê·¸ì¸ëœ ì„¸ì…˜ì…ë‹ˆë‹¤.\n");
 
         return;
     }
 
     if (packet->header.size != sizeof(LoginRequest))
     {
-        printf("[·Î±×ÀÎ ½ÇÆĞ] Àß¸øµÈ ÆĞÅ¶ Å©±âÀÔ´Ï´Ù.\n");
+        printf("[ë¡œê·¸ì¸ ì‹¤íŒ¨] ì˜ëª»ëœ íŒ¨í‚· í¬ê¸°ì…ë‹ˆë‹¤.\n");
 
         return;
     }
@@ -69,7 +76,7 @@ void PacketHandler::HandleLogin(Session* session, const LoginRequest* packet)
 
         session->Send(reinterpret_cast<const char*>(&response), sizeof(response));
 
-        printf("[·Î±×ÀÎ ½ÇÆĞ] Àß¸øµÈ ´Ğ³×ÀÓÀÔ´Ï´Ù.\n");
+        printf("[ë¡œê·¸ì¸ ì‹¤íŒ¨] ì˜ëª»ëœ ë‹‰ë„¤ì„ì…ë‹ˆë‹¤.\n");
 
         return;
     }
@@ -83,7 +90,7 @@ void PacketHandler::HandleLogin(Session* session, const LoginRequest* packet)
 
         session->Send(reinterpret_cast<const char*>(&response), sizeof(response));
 
-        printf("[·Î±×ÀÎ ½ÇÆĞ] ÀÌ¹Ì »ç¿ë ÁßÀÎ ´Ğ³×ÀÓ: %s\n", requestedNickname.c_str());
+        printf("[ë¡œê·¸ì¸ ì‹¤íŒ¨] ì´ë¯¸ ì‚¬ìš© ì¤‘ì¸ ë‹‰ë„¤ì„: %s\n", requestedNickname.c_str());
 
         return;
     }
@@ -97,26 +104,26 @@ void PacketHandler::HandleLogin(Session* session, const LoginRequest* packet)
 
     if (!session->Send(reinterpret_cast<const char*>(&response), sizeof(response)))
     {
-        printf("[¿À·ù] ·Î±×ÀÎ ÀÀ´ä Àü¼Û ½ÇÆĞ\n");
+        printf("[ì˜¤ë¥˜] ë¡œê·¸ì¸ ì‘ë‹µ ì „ì†¡ ì‹¤íŒ¨\n");
 
         return;
     }
 
-    printf("[·Î±×ÀÎ ¼º°ø] ID=%d, ´Ğ³×ÀÓ=%s\n", session->GetId(), session->GetNickname().c_str());
+    printf("[ë¡œê·¸ì¸ ì„±ê³µ] ID=%d, ë‹‰ë„¤ì„=%s\n", session->GetId(), session->GetNickname().c_str());
 }
 
 void PacketHandler::HandleChat(Session* session, const ChatRequest* packet)
 {
     if (session->GetState() != SessionState::LOGIN)
     {
-        printf("[Ã¤ÆÃ °ÅºÎ] ·Î±×ÀÎÇÏÁö ¾ÊÀº ¼¼¼ÇÀÔ´Ï´Ù.\n");
+        printf("[ì±„íŒ… ê±°ë¶€] ë¡œê·¸ì¸í•˜ì§€ ì•Šì€ ì„¸ì…˜ì…ë‹ˆë‹¤.\n");
 
         return;
     }
 
     if (packet->header.size != sizeof(ChatRequest))
     {
-        printf("[Ã¤ÆÃ °ÅºÎ] Àß¸øµÈ ÆĞÅ¶ Å©±âÀÔ´Ï´Ù.\n");
+        printf("[ì±„íŒ… ê±°ë¶€] ì˜ëª»ëœ íŒ¨í‚· í¬ê¸°ì…ë‹ˆë‹¤.\n");
 
         return;
     }
@@ -125,7 +132,7 @@ void PacketHandler::HandleChat(Session* session, const ChatRequest* packet)
 
     if (messageLength == 0 || messageLength >= sizeof(packet->message))
     {
-        printf("[Ã¤ÆÃ °ÅºÎ] Àß¸øµÈ ¸Ş½ÃÁöÀÔ´Ï´Ù.\n");
+        printf("[ì±„íŒ… ê±°ë¶€] ì˜ëª»ëœ ë©”ì‹œì§€ì…ë‹ˆë‹¤.\n");
 
         return;
     }
@@ -142,8 +149,34 @@ void PacketHandler::HandleChat(Session* session, const ChatRequest* packet)
 
     strncpy_s(response.message, sizeof(response.message), packet->message, _TRUNCATE);
 
-    printf("[¹ŞÀº Ã¤ÆÃ] %s(%d): %s\n", response.nickname, response.userId, response.message);
+    printf("[ë°›ì€ ì±„íŒ…] %s(%d): %s\n", response.nickname, response.userId, response.message);
 
     session->GetServer()->Broadcast(
         session, reinterpret_cast<const char*>(&response), sizeof(response));
+}
+
+void PacketHandler::HandleWorldChat(Session* session, const WorldChatRequest* packet)
+{
+    if (session->GetState() != SessionState::LOGIN)
+    {
+        return;
+    }
+
+    if (packet->header.size != sizeof(WorldChatRequest))
+    {
+        return;
+    }
+
+    const size_t messageLength = strnlen_s(packet->message, sizeof(packet->message));
+
+    if (messageLength == 0 || messageLength >= sizeof(packet->message))
+    {
+        return;
+    }
+
+    if (!session->GetServer()->SendWorldChat(
+            session->GetId(), session->GetNickname(), packet->message))
+    {
+        printf("[ì›”ë“œ ì±„íŒ… ì‹¤íŒ¨] WorldServer ì—°ê²°ì„ í™•ì¸í•˜ì„¸ìš”.\n");
+    }
 }

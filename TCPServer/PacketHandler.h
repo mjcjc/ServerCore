@@ -18,4 +18,5 @@ class PacketHandler
     static void HandleLogin(Session* session, const LoginRequest* packet);
 
     static void HandleChat(Session* session, const ChatRequest* packet);
+    static void HandleWorldChat(Session* session, const WorldChatRequest* packet);
 };

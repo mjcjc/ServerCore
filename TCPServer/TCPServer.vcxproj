@@ -172,12 +172,15 @@
     <ClCompile Include="IocpCore.cpp" />
     <ClCompile Include="MasterClient.cpp" />
     <ClCompile Include="NetworkCore.cpp" />
-    <ClCompile Include="PacketHandler.cpp" />
+    <ClCompile Include="PacketHandler.cpp">
+      <AdditionalOptions>/source-charset:utf-8 /execution-charset:.949 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="SendQueue.cpp" />
     <ClCompile Include="ServerConfig.cpp" />
     <ClCompile Include="Session.cpp" />
     <ClCompile Include="SocketUtils.cpp" />
     <ClCompile Include="TCPServer.cpp" />
+    <ClCompile Include="WorldClient.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Common.h" />
@@ -193,6 +196,8 @@
     <ClInclude Include="ServerConfig.h" />
     <ClInclude Include="Session.h" />
     <ClInclude Include="SocketUtils.h" />
+    <ClInclude Include="WorldClient.h" />
+    <ClInclude Include="..\WorldServer\WorldProtocol.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
