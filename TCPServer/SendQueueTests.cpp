@@ -501,6 +501,31 @@ namespace
                    queue.Enqueue(&extraByte, 1) == EnqueueResult::START_FLUSHING,
                "finishing the last async send releases queue capacity");
     }
+
+    void TestAsyncSendBatchesQueuedPackets()
+    {
+        SendQueue queue;
+        std::vector<char> firstPacket(128, 'a');
+        std::vector<char> secondPacket(128, 'b');
+        std::vector<char> thirdPacket(128, 'c');
+        std::vector<char> inFlightPacket;
+        std::vector<char> nextBatch;
+
+        queue.Enqueue(firstPacket.data(), firstPacket.size());
+        queue.TryBeginSend(inFlightPacket);
+        queue.Enqueue(secondPacket.data(), secondPacket.size());
+        queue.Enqueue(thirdPacket.data(), thirdPacket.size());
+
+        const bool hasNextBatch =
+            queue.CompleteSendAndGetNext(inFlightPacket.size(), nextBatch);
+
+        Expect(hasNextBatch && nextBatch.size() == secondPacket.size() + thirdPacket.size(),
+               "send completion batches queued packets into one async send");
+        Expect(nextBatch[0] == 'b' && nextBatch[secondPacket.size()] == 'c',
+               "batched send preserves packet order and contents");
+        Expect(!queue.CompleteSendAndGetNext(nextBatch.size(), inFlightPacket),
+               "batched send completion drains every included packet");
+    }
 }
 
 int main()
@@ -516,6 +541,7 @@ int main()
     TestConcurrentEnqueueAndPop();
     TestConcurrentClose();
     TestAsyncSendKeepsInFlightBytesAndAdvancesQueue();
+    TestAsyncSendBatchesQueuedPackets();
 
     if (failures != 0)
     {

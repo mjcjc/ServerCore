@@ -1,5 +1,7 @@
 #include "SendQueue.h"
 
+#include <algorithm>
+
 EnqueueResult SendQueue::Enqueue(const char* packetData, std::size_t packetSize)
 {
     if (packetData == nullptr || packetSize == 0)
@@ -111,9 +113,43 @@ bool SendQueue::CompleteSendAndGetNext(std::size_t completedPacketSize,
         return false;
     }
 
-    outNextPacket = std::move(packets.front());
-    packets.pop();
-    return true;
+    return BuildNextBatch(outNextPacket);
+}
+
+bool SendQueue::BuildNextBatch(std::vector<char>& outBatch)
+{
+    if (packets.empty())
+    {
+        return false;
+    }
+
+    const std::size_t firstPacketSize = packets.front().size();
+
+    if (firstPacketSize >= MAX_BATCH_BYTES)
+    {
+        outBatch = std::move(packets.front());
+        packets.pop();
+        return true;
+    }
+
+    const std::size_t batchCapacity = (std::min)(queuedBytes, MAX_BATCH_BYTES);
+    outBatch.clear();
+    outBatch.reserve(batchCapacity);
+
+    while (!packets.empty())
+    {
+        const std::vector<char>& packet = packets.front();
+
+        if (!outBatch.empty() && outBatch.size() + packet.size() > MAX_BATCH_BYTES)
+        {
+            break;
+        }
+
+        outBatch.insert(outBatch.end(), packet.begin(), packet.end());
+        packets.pop();
+    }
+
+    return !outBatch.empty();
 }
 
 void SendQueue::Close()

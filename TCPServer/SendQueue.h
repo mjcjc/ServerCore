@@ -28,6 +28,9 @@ class SendQueue
 
   private:
     static constexpr std::size_t MAX_QUEUED_BYTES = 64 * 1024; // 64KB
+    static constexpr std::size_t MAX_BATCH_BYTES = 16 * 1024;  // 16KB
+
+    bool BuildNextBatch(std::vector<char>& outBatch);
 
     std::mutex queueMutex;
 
