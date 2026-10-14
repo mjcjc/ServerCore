@@ -368,3 +368,6 @@ FodyWeavers.xsd
 
 # Generated stress-test reports
 /test-results/
+
+# Preserve portfolio evidence logs
+!/docs/evidence/*.log

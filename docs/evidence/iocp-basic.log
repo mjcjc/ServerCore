@@ -1,0 +1,22 @@
+Connecting 3 clients to 127.0.0.1:7777 with 3 connector threads...
+
+=== IOCP TCP Stress Test Result ===
+Target:              127.0.0.1:7777
+Configured clients:  3
+Connector threads:   3
+IOCP worker threads: 8
+Connected:           3
+Connection failed:   0
+Login succeeded:     3
+Login failed:        0
+Active clients:      3
+Messages sent:       100
+Messages received:   200
+Expected received:   200
+Send errors:         0
+Receive errors:      0
+Receive throughput:  20.00 messages/sec
+Average latency:     7.672 ms
+P95 latency:         11.379 ms
+P99 latency:         11.717 ms
+Load duration:       10.001 sec
